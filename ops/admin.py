@@ -1,3 +1,38 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import ActivityEvent, Comment, IdempotencyKey, Membership, Team, WorkItem
+
+
+@admin.register(Team)
+class TeamAdmin(admin.ModelAdmin):
+    list_display = ["name"]
+
+
+@admin.register(Membership)
+class MembershipAdmin(admin.ModelAdmin):
+    list_display = ["user", "team", "role"]
+    list_filter = ["team", "role"]
+
+
+@admin.register(WorkItem)
+class WorkItemAdmin(admin.ModelAdmin):
+    list_display = ["id", "title", "team", "type", "priority", "status", "assignee", "version"]
+    list_filter = ["team", "status", "priority", "type"]
+    search_fields = ["title"]
+
+
+@admin.register(ActivityEvent)
+class ActivityEventAdmin(admin.ModelAdmin):
+    list_display = ["item", "actor", "type", "old_value", "new_value", "created_at"]
+    list_filter = ["type"]
+
+    # History is append-only: read it here, never edit it.
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+admin.site.register(Comment)
+admin.site.register(IdempotencyKey)
