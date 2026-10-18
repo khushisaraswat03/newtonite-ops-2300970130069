@@ -1,12 +1,15 @@
 """
 Workflow rules: which status changes are allowed, who may make them, and when a reason is required.
 
-    Open ──▶ In Progress ──▶ Awaiting Approval ──approve──▶ Resolved ──▶ Closed
+    Open ─claim─▶ In Progress ──▶ Awaiting Approval ──approve──▶ Resolved ──▶ Closed
                  ▲                  │                          │           │
                  └──── reject ──────┘                          │           │
                  └──────────────────── reopen ─────────────────┴───────────┘
 
     Open / In Progress / Awaiting Approval ──cancel──▶ Cancelled (final)
+
+Open -> In Progress is not a transition here: it only happens by claiming
+(see services.claim_item), and release/unassign send an item back to Open.
 """
 
 from django.core.exceptions import PermissionDenied
@@ -23,7 +26,6 @@ S = WorkItem.Status
 #   "approver" - a Lead of the item's team who is NOT the assignee (four-eyes)
 # Admins count as Leads everywhere.
 TRANSITIONS = {
-    (S.OPEN, S.IN_PROGRESS): {"who": "assignee", "reason": False},
     (S.IN_PROGRESS, S.AWAITING_APPROVAL): {"who": "assignee", "reason": False},
     (S.AWAITING_APPROVAL, S.RESOLVED): {"who": "approver", "reason": False},
     (S.AWAITING_APPROVAL, S.IN_PROGRESS): {"who": "lead", "reason": True},  # reject
@@ -61,9 +63,6 @@ def check_transition(user, item, new_status, reason=""):
     rule = TRANSITIONS.get((item.status, new_status))
     if rule is None:
         raise TransitionError(f"Cannot move an item from {item.status} to {new_status}.")
-
-    if new_status == S.IN_PROGRESS and item.status == S.OPEN and item.assignee_id is None:
-        raise TransitionError("Claim the item before starting work on it.")
 
     if not _who_allowed(user, item, rule["who"]):
         if rule["who"] == "approver" and item.assignee_id == user.id:
