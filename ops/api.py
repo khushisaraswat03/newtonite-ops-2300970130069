@@ -8,7 +8,7 @@ from rest_framework.views import exception_handler as drf_exception_handler
 from . import services
 from .idempotency import idempotent
 from .models import WorkItem
-from .permissions import check, team_roles
+from .permissions import check
 from .queries import BadQuery, filter_items, paginate
 from .serializers import (
     ActivityEventSerializer, CommentInput, CommentSerializer, CreateItemInput, EditItemInput,

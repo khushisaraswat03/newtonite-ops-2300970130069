@@ -1,7 +1,4 @@
-import pytest
 from rest_framework.test import APIClient
-
-from ops.models import WorkItem
 
 
 def client_for(user):

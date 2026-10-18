@@ -57,7 +57,7 @@ class OpsLoginView(LoginView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["show_demo_users"] = settings.DEBUG
+        ctx["show_demo_users"] = settings.SHOW_DEMO_ACCOUNTS
         ctx["demo_users"] = DEMO_USERS
         return ctx
 

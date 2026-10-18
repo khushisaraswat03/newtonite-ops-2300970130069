@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: newtonite-ops
+    runtime: docker
+    plan: free
+    dockerCommand: ./scripts/start-production.sh
+    healthCheckPath: /login/
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: newtonite-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: SHOW_DEMO_ACCOUNTS
+        value: "1"
+
+databases:
+  - name: newtonite-db
+    plan: free
+    databaseName: newtonite
+    user: newtonite
