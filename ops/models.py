@@ -129,7 +129,7 @@ class ActivityEvent(models.Model):
         PRIORITY_CHANGED = "priority_changed", "Priority changed"
         CLAIMED = "claimed", "Claimed"
         RELEASED = "released", "Released"
-        UNASSIGNED = "unassigned", "Unassigned by Lead"
+        UNASSIGNED = "unassigned", "Unassigned"
         HANDED_OFF = "handed_off", "Handed off to another team"
         COMMENTED = "commented", "Commented"
 

@@ -8,6 +8,7 @@ Rules (decided in design):
 - Only Members/Leads of the item's team can WORK on it.
 - Only Leads of the item's team can do the Lead-only actions.
 - Only the assignee or a Lead can edit an item (priority, due date).
+- Status changes have their own rules in workflow.py.
 - The person who raised an item from outside the team can still comment on it.
 """
 
@@ -27,7 +28,6 @@ ACTION_ROLES = {
     "claim": WORK,
     "release": WORK,
     "edit": {LEAD},  # plus the assignee, see can()
-    "transition": WORK,  # which transitions exactly is decided by the workflow rules
     "unassign": {LEAD},
     "handoff": {LEAD},
 }

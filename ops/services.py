@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from .models import ActivityEvent, Comment, WorkItem
 from .permissions import ADMIN, LEAD, can_raise, check, role_in_team
+from .workflow import check_transition
 
 E = ActivityEvent.Type
 S = WorkItem.Status
@@ -208,5 +209,43 @@ def update_item(user, item, *, version, priority=None, due_date=None, reason="")
 
     for type, old, new in events:
         _log(item, user, type, old=old, new=new, reason=reason)
+    item.refresh_from_db()
+    return item
+
+
+@transaction.atomic
+def transition_item(user, item, new_status, *, version, reason=""):
+    """
+    Move an item to a new status, following the rules in workflow.py.
+    Uses the same optimistic lock as update_item: the change only applies if
+    the item is still at the version (and status) the user was looking at.
+    """
+    check_transition(user, item, new_status, reason)
+    reason = (reason or "").strip()
+    old_status = item.status
+    now = timezone.now()
+
+    changes = {"status": new_status}
+    if new_status == S.RESOLVED:
+        changes["resolved_at"] = now  # stops the SLA clock
+    if old_status in (S.RESOLVED, S.CLOSED):
+        changes["resolved_at"] = None  # reopened: it is not resolved any more
+    # Reopened to the queue by a Lead or the creator: anyone can claim it again.
+    clears_assignee = new_status == S.OPEN and item.assignee_id is not None
+    if clears_assignee:
+        changes["assignee"] = None
+
+    updated = WorkItem.objects.filter(pk=item.pk, version=version, status=old_status).update(
+        **changes, version=F("version") + 1, updated_at=now,
+    )
+    if updated == 0:
+        current = WorkItem.objects.get(pk=item.pk)
+        raise ConflictError(
+            "This item was changed by someone else. Reload and try again.", current=current,
+        )
+
+    _log(item, user, E.STATUS_CHANGED, old=old_status, new=new_status, reason=reason, at=now)
+    if clears_assignee:
+        _log(item, user, E.UNASSIGNED, old=item.assignee.username, reason="Reopened to the team queue", at=now)
     item.refresh_from_db()
     return item
