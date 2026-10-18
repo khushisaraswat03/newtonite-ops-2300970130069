@@ -33,7 +33,7 @@ def test_stale_update_is_rejected_and_data_unchanged(world, claimed_item):
 def test_assignee_can_raise_priority_and_sla_is_recalculated(world, claimed_item):
     item = update_item(world.alice, claimed_item, version=claimed_item.version, priority="P1")
     assert item.priority == "P1"
-    assert item.sla_due_at == item.created_at + WorkItem.SLA["P1"]
+    assert item.sla_due_at == item.team_since + WorkItem.SLA["P1"]
     event = ActivityEvent.objects.get(item=item, type="priority_changed")
     assert (event.old_value, event.new_value) == ("P2", "P1")
 

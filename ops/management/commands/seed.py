@@ -248,6 +248,7 @@ class Command(BaseCommand):
             assignee=assignee,
             created_by=creator,
             created_at=created_at,
+            team_since=created_at,
             resolved_at=resolved_at,
             last_activity_at=events[-1]["created_at"],
             # One version per change to the item: "created" is version 1, every later change adds one.

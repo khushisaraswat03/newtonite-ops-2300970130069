@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from .models import ActivityEvent, Comment, WorkItem
 from .permissions import ADMIN, LEAD, can_raise, check, role_in_team
-from .workflow import check_transition
+from .workflow import TransitionError, check_transition
 
 E = ActivityEvent.Type
 S = WorkItem.Status
@@ -56,7 +56,7 @@ def create_item(user, *, team, title, type, priority, description="", due_date=N
     item = WorkItem(
         team=team, title=title, type=type, priority=priority,
         description=description or "", due_date=due_date,
-        created_by=user, created_at=now, last_activity_at=now,
+        created_by=user, created_at=now, team_since=now, last_activity_at=now,
     )
     item.sla_due_at = item.compute_sla_due_at()
     item.save()
@@ -183,8 +183,7 @@ def update_item(user, item, *, version, priority=None, due_date=None, reason="")
             if not reason:
                 raise ValidationError({"reason": "A reason is required to lower the priority."})
         changes["priority"] = priority
-        # SLA is measured from creation, so it is recalculated for the new priority.
-        changes["sla_due_at"] = item.created_at + WorkItem.SLA[priority]
+        changes["sla_due_at"] = item.compute_sla_due_at(priority)
         events.append((E.PRIORITY_CHANGED, item.priority, priority))
 
     if due_date is not None and due_date != item.due_date:
@@ -247,5 +246,50 @@ def transition_item(user, item, new_status, *, version, reason=""):
     _log(item, user, E.STATUS_CHANGED, old=old_status, new=new_status, reason=reason, at=now)
     if clears_assignee:
         _log(item, user, E.UNASSIGNED, old=item.assignee.username, reason="Reopened to the team queue", at=now)
+    item.refresh_from_db()
+    return item
+
+
+HANDOFF_FROM = {S.OPEN, S.IN_PROGRESS}
+
+
+@transaction.atomic
+def handoff_item(user, item, new_team, *, version, reason):
+    """
+    A Lead moves an item to the team that should really handle it.
+
+    In one step it lands in the new team's queue: status Open, no assignee
+    (the old assignee isn't in the new team). Priority is kept so an urgent
+    item doesn't get lost; the new team's Lead can lower it with a reason.
+    The SLA restarts for the new team; created_at still shows the total wait.
+    """
+    check(user, "handoff", item)
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValidationError({"reason": "A reason is required to hand off an item."})
+    if new_team.pk == item.team_id:
+        raise ValidationError({"team": "The item is already in this team."})
+    if item.status not in HANDOFF_FROM:
+        raise TransitionError("Only Open or In Progress items can be handed off.")
+
+    old_team, old_status, old_assignee = item.team, item.status, item.assignee
+    now = timezone.now()
+
+    updated = WorkItem.objects.filter(
+        pk=item.pk, version=version, team=old_team, status__in=HANDOFF_FROM,
+    ).update(
+        team=new_team, status=S.OPEN, assignee=None,
+        team_since=now, sla_due_at=now + WorkItem.SLA[item.priority],
+        version=F("version") + 1, updated_at=now,
+    )
+    if updated == 0:
+        current = WorkItem.objects.get(pk=item.pk)
+        raise ConflictError("This item was changed by someone else. Reload and try again.", current=current)
+
+    _log(item, user, E.HANDED_OFF, old=old_team.name, new=new_team.name, reason=reason, at=now)
+    if old_status != S.OPEN:
+        _log(item, user, E.STATUS_CHANGED, old=old_status, new=S.OPEN, reason=f"Handed off to {new_team.name}", at=now)
+    if old_assignee:
+        _log(item, user, E.UNASSIGNED, old=old_assignee.username, reason=f"Handed off to {new_team.name}", at=now)
     item.refresh_from_db()
     return item

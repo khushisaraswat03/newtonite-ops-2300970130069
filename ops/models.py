@@ -90,6 +90,10 @@ class WorkItem(models.Model):
     version = models.PositiveIntegerField(default=1)
 
     created_at = models.DateTimeField(default=timezone.now)
+    # When the current team received the item (creation, or the latest handoff).
+    # The SLA is measured from here, so a team isn't blamed for time another team had it;
+    # created_at still shows how long the requester has been waiting overall.
+    team_since = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     # Bumped by every activity event (comments too); drives stale detection.
     last_activity_at = models.DateTimeField(default=timezone.now)
@@ -114,9 +118,9 @@ class WorkItem(models.Model):
     def __str__(self):
         return f"#{self.pk} {self.title}"
 
-    def compute_sla_due_at(self):
-        """SLA is measured from creation, so changing priority recalculates it from the start."""
-        return self.created_at + self.SLA[self.priority]
+    def compute_sla_due_at(self, priority=None):
+        """SLA runs from when the current team got the item; a priority change recalculates it from there."""
+        return self.team_since + self.SLA[priority or self.priority]
 
 
 class ActivityEvent(models.Model):
