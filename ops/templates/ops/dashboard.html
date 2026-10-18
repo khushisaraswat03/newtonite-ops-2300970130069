@@ -1,0 +1,35 @@
+{% extends "ops/base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<section class="hello">
+  <div>
+    <h1>{{ greeting }}, {{ request.user.username }} ☁️</h1>
+    <p>Here's what needs attention across your teams.</p>
+    <div class="hello-roles">
+      {% if request.user.is_superuser %}<span class="role-chip lead">Admin · all teams</span>{% endif %}
+      {% for r in roles %}<span class="role-chip {{ r.role }}">{{ r.team }} · {{ r.role }}</span>{% endfor %}
+    </div>
+  </div>
+  {% include "ops/_newt.html" with size="130" class_="hello-newt" %}
+</section>
+
+<section class="tiles">
+  {% for t in tiles %}
+    <a class="tile {{ t.css }} {% if t.view == selected %}selected{% endif %}" href="?view={{ t.view }}">
+      <span class="emoji">{{ t.emoji }}</span>
+      <div class="count">{{ t.count }}</div>
+      <div class="label">{{ t.label }}</div>
+      <div class="hint">{{ t.hint }}</div>
+    </a>
+  {% endfor %}
+</section>
+
+<section>
+  <div class="section-head">
+    <h2>{{ selected_label }}</h2>
+    <a href="{% url 'item_list' %}">Browse all items →</a>
+  </div>
+  {% include "ops/_item_rows.html" with empty_message="All clear here. The newt is napping 💤" %}
+</section>
+{% endblock %}

@@ -176,10 +176,10 @@ class Command(BaseCommand):
         status = rng.choices(list(STATUS_WEIGHTS), weights=STATUS_WEIGHTS.values())[0]
         priority = rng.choices(list(PRIORITY_WEIGHTS), weights=PRIORITY_WEIGHTS.values())[0]
 
-        # Active items are recent (some become SLA-breached or stale);
-        # finished items are spread over the last 60 days.
+        # Active items are recent relative to their SLA: about a third are past
+        # their deadline. Finished items are spread over the last 60 days.
         if status in ACTIVE:
-            created_at = now - timedelta(minutes=rng.randint(10, 7 * 24 * 60))
+            created_at = now - WorkItem.SLA[priority] * rng.uniform(0.05, 1.5)
         else:
             created_at = now - timedelta(minutes=rng.randint(7 * 24 * 60, 60 * 24 * 60))
 

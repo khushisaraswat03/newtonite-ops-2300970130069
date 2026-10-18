@@ -1,0 +1,48 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Newtonite Ops{% endblock %} · Newtonite Ops</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'ops/style.css' %}">
+</head>
+<body>
+{% block body %}
+  <header class="topbar">
+    <div class="container">
+      <a class="brand" href="{% url 'dashboard' %}">{% include "ops/_newt.html" with size="46" %} Newtonite Ops</a>
+      <nav class="nav">
+        <a href="{% url 'dashboard' %}" class="{% if nav == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{% url 'item_list' %}" class="{% if nav == 'items' %}active{% endif %}">All items</a>
+        <a href="{% url 'item_create' %}" class="{% if nav == 'create' %}active{% endif %}">+ Raise item</a>
+      </nav>
+      <div class="who">
+        <span class="avatar">{{ request.user.username|first }}</span>
+        <span>{{ request.user.username }}</span>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout">Log out</button></form>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    {% for message in messages %}
+      <div class="flash sticker {{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+{% endblock %}
+<script>
+  // First line of double-click defence: disable the button as soon as a form is sent.
+  // (The second line is the idempotency key in each form, checked on the server.)
+  document.addEventListener("submit", function (e) {
+    e.target.querySelectorAll("button[type=submit], button:not([type])").forEach(function (b) {
+      b.disabled = true;
+      b.style.opacity = .6;
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{# The mascot: a little blue newt. Pass size="..." and class_="..." to include it anywhere. #}
+<svg class="newt {{ class_ }}" width="{{ size|default:'120' }}" viewBox="0 0 150 96" role="img" aria-label="Newt mascot">
+  <g stroke="#1B2A4A" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <!-- tail, curling up behind -->
+    <path d="M52 60 C 28 66, 8 56, 12 38 C 14 30, 22 29, 24 35 C 22 46, 32 52, 52 50 Z" fill="#8DB3FF"/>
+    <!-- feet -->
+    <ellipse cx="62" cy="74" rx="8" ry="5" fill="#8DB3FF"/>
+    <ellipse cx="92" cy="74" rx="8" ry="5" fill="#8DB3FF"/>
+    <!-- body -->
+    <ellipse cx="78" cy="59" rx="32" ry="16" fill="#8DB3FF"/>
+    <!-- frilly gills at the back of the head -->
+    <path d="M92 30 l-9 -8 M89 37 l-12 -3 M90 45 l-11 2" fill="none"/>
+    <!-- head -->
+    <circle cx="110" cy="46" r="22" fill="#8DB3FF"/>
+  </g>
+  <!-- belly + spots -->
+  <ellipse cx="80" cy="66" rx="20" ry="6" fill="#C9DBFF"/>
+  <circle cx="68" cy="52" r="3" fill="#C9DBFF"/>
+  <circle cx="82" cy="49" r="2.3" fill="#C9DBFF"/>
+  <circle cx="57" cy="57" r="2" fill="#C9DBFF"/>
+  <!-- face -->
+  <g class="newt-eyes">
+    <circle cx="103" cy="42" r="3.6" fill="#1B2A4A"/>
+    <circle cx="118" cy="42" r="3.6" fill="#1B2A4A"/>
+    <circle cx="104.2" cy="40.8" r="1.2" fill="#fff"/>
+    <circle cx="119.2" cy="40.8" r="1.2" fill="#fff"/>
+  </g>
+  <ellipse cx="98" cy="51" rx="4.5" ry="2.6" fill="#FF9FB2"/>
+  <ellipse cx="123" cy="51" rx="4.5" ry="2.6" fill="#FF9FB2"/>
+  <path d="M106.5 50 Q110.5 54 114.5 50" fill="none" stroke="#1B2A4A" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

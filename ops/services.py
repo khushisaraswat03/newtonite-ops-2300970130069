@@ -39,6 +39,21 @@ def _log(item, actor, type, old="", new="", reason="", at=None):
     item.last_activity_at = at
 
 
+def _ensure_current(item, version):
+    """
+    Reject a stale request before checking anything else: if the user was looking at an
+    old version, "you need a reason" or "invalid transition" would be about data they
+    haven't seen. (The conditional UPDATE still guards the race between here and the write.)
+    """
+    item.refresh_from_db()  # judge the request against the latest data, not the caller's copy
+    if item.version != version:
+        raise ConflictError(
+            f"This item was changed by someone else (you had version {version}, "
+            f"it is now version {item.version}). Reload and try again.",
+            current=item,
+        )
+
+
 @transaction.atomic
 def create_item(user, *, team, title, type, priority, description="", due_date=None):
     if not can_raise(user):
@@ -167,6 +182,7 @@ def update_item(user, item, *, version, priority=None, due_date=None, reason="")
     the item in the meantime, 0 rows match and we return 409 with the latest item.
     """
     check(user, "edit", item)
+    _ensure_current(item, version)
     reason = (reason or "").strip()
 
     if item.status in FINISHED:
@@ -219,6 +235,8 @@ def transition_item(user, item, new_status, *, version, reason=""):
     Uses the same optimistic lock as update_item: the change only applies if
     the item is still at the version (and status) the user was looking at.
     """
+    check(user, "view", item)
+    _ensure_current(item, version)
     check_transition(user, item, new_status, reason)
     reason = (reason or "").strip()
     old_status = item.status
@@ -264,6 +282,7 @@ def handoff_item(user, item, new_team, *, version, reason):
     The SLA restarts for the new team; created_at still shows the total wait.
     """
     check(user, "handoff", item)
+    _ensure_current(item, version)
     reason = (reason or "").strip()
     if not reason:
         raise ValidationError({"reason": "A reason is required to hand off an item."})

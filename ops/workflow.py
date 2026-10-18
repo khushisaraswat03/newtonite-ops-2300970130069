@@ -17,7 +17,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404
 
 from .models import WorkItem
-from .permissions import ADMIN, LEAD, MEMBER, check, role_in_team
+from .permissions import ADMIN, LEAD, MEMBER, can, check, role_in_team
 
 S = WorkItem.Status
 
@@ -100,3 +100,17 @@ def allowed_transitions(user, item):
             continue
         result.append(new)
     return result
+
+
+def allowed_actions(user, item):
+    """Everything the user may do with the item right now, so screens show only valid buttons.
+    The server still checks every action; this is a convenience, not security."""
+    return {
+        "claim": can(user, "claim", item) and item.status == S.OPEN and item.assignee_id is None,
+        "release": item.assignee_id == user.id and item.status == S.IN_PROGRESS,
+        "unassign": can(user, "unassign", item) and item.assignee_id is not None and item.status == S.IN_PROGRESS,
+        "edit": can(user, "edit", item) and item.status not in (S.CLOSED, S.CANCELLED),
+        "handoff": can(user, "handoff", item) and item.status in (S.OPEN, S.IN_PROGRESS),
+        "comment": can(user, "comment", item),
+        "transitions": allowed_transitions(user, item),
+    }

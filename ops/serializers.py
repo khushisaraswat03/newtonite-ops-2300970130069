@@ -2,9 +2,8 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .models import ActivityEvent, Comment, Team, WorkItem
-from .permissions import can
 from .queries import ACTIVE, STALE_AFTER
-from .workflow import allowed_transitions
+from .workflow import allowed_actions
 
 
 # ---- Output: what the API sends back ----
@@ -39,19 +38,7 @@ class WorkItemDetailSerializer(WorkItemListSerializer):
         fields = WorkItemListSerializer.Meta.fields + ["description", "resolved_at", "allowed"]
 
     def get_allowed(self, item):
-        """What the current user may do right now, so a client can show only valid buttons.
-        The server still checks every action; this is a convenience, not security."""
-        user = self.context["user"]
-        return {
-            "claim": can(user, "claim", item) and item.status == WorkItem.Status.OPEN and item.assignee_id is None,
-            "release": item.assignee_id == user.id and item.status == WorkItem.Status.IN_PROGRESS,
-            "unassign": can(user, "unassign", item) and item.assignee_id is not None
-                        and item.status == WorkItem.Status.IN_PROGRESS,
-            "edit": can(user, "edit", item),
-            "handoff": can(user, "handoff", item),
-            "comment": can(user, "comment", item),
-            "transitions": allowed_transitions(user, item),
-        }
+        return allowed_actions(self.context["user"], item)
 
 
 class ActivityEventSerializer(serializers.ModelSerializer):

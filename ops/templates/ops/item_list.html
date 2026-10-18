@@ -1,0 +1,40 @@
+{% extends "ops/base.html" %}
+{% block title %}All items{% endblock %}
+
+{% block content %}
+<div class="section-head">
+  <h1>All items</h1>
+  <a class="btn btn-butter" href="{% url 'item_create' %}">+ Raise item</a>
+</div>
+
+<form class="filters sticker" method="get">
+  <input class="input search" type="search" name="q" value="{{ f.q }}" placeholder="🔍  Search titles & descriptions… e.g. refund">
+  <select name="status">
+    <option value="">Any status</option>
+    {% for value, label in statuses %}<option value="{{ value }}" {% if f.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="priority">
+    <option value="">Any priority</option>
+    {% for value, label in priorities %}<option value="{{ value }}" {% if f.priority == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="type">
+    <option value="">Any type</option>
+    {% for value, label in types %}<option value="{{ value }}" {% if f.type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="team">
+    <option value="">Any team</option>
+    {% for t in teams %}<option value="{{ t.id }}" {% if f.team == t.id|stringformat:"s" %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+  </select>
+  <select name="assignee">
+    <option value="">Anyone</option>
+    <option value="me" {% if f.assignee == "me" %}selected{% endif %}>Assigned to me</option>
+    <option value="none" {% if f.assignee == "none" %}selected{% endif %}>Unassigned</option>
+  </select>
+  <button class="btn btn-primary" type="submit">Filter</button>
+  {% if filters_on %}<a class="clear" href="{% url 'item_list' %}">Clear</a>{% endif %}
+</form>
+
+<p class="muted list-note">Most urgent first: P1 before P2, then nearest SLA deadline. Only items you're allowed to see are listed.</p>
+
+{% include "ops/_item_rows.html" with empty_message="No items match these filters. Try clearing some?" %}
+{% endblock %}

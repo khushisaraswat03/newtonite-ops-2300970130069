@@ -1,0 +1,85 @@
+{% extends "ops/base.html" %}
+{% block title %}Raise an item{% endblock %}
+
+{% block content %}
+<div class="create-layout">
+  <form class="create-card sticker" method="post">
+    {% csrf_token %}
+    <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
+    <h1>Raise an item ✨</h1>
+    <p class="muted">You can raise work for any team. That team's members will pick it up.</p>
+
+    {% if errors.form %}<div class="form-error">{{ errors.form.0 }}</div>{% endif %}
+
+    <div class="field">
+      <label for="title">What's going on?</label>
+      <input class="input" id="title" name="title" maxlength="200" required value="{{ v.title }}"
+             placeholder="e.g. UPI refund not credited for order #48213">
+      {% if errors.title %}<div class="field-error">{{ errors.title.0 }}</div>{% endif %}
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="team">Which team should handle it?</label>
+        <select id="team" name="team" required>
+          <option value="">Pick a team…</option>
+          {% for t in teams %}
+            <option value="{{ t.id }}" {% if v.team == t.id|stringformat:"s" %}selected{% endif %}>
+              {{ t.name }}{% if t.id in my_teams %} (your team){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        {% if errors.team %}<div class="field-error">{{ errors.team.0 }}</div>{% endif %}
+      </div>
+      <div class="field">
+        <label for="type">Type</label>
+        <select id="type" name="type" required>
+          {% for value, label in types %}<option value="{{ value }}" {% if v.type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Priority</label>
+      <div class="priority-picker">
+        {% for value, label in priorities %}
+          <label class="priority-option">
+            <input type="radio" name="priority" value="{{ value }}" required
+                   {% if v.priority == value or not v.priority and value == "P3" %}checked{% endif %}>
+            <span class="tag {{ value }}">{{ label }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {% if errors.priority %}<div class="field-error">{{ errors.priority.0 }}</div>{% endif %}
+    </div>
+
+    <div class="field">
+      <label for="description">Details <span class="muted">(optional)</span></label>
+      <textarea id="description" name="description" rows="5"
+                placeholder="What happened, who's affected, anything you've already tried…">{{ v.description }}</textarea>
+    </div>
+
+    <div class="field" style="max-width: 240px">
+      <label for="due_date">Due date <span class="muted">(optional)</span></label>
+      <input class="input" type="date" id="due_date" name="due_date" value="{{ v.due_date }}">
+      {% if errors.due_date %}<div class="field-error">{{ errors.due_date.0 }}</div>{% endif %}
+    </div>
+
+    <button class="btn btn-primary" type="submit">Raise item →</button>
+  </form>
+
+  <aside class="create-aside">
+    <div class="sticker tip">
+      <h3>How priority works 🚩</h3>
+      <ul>
+        <li><span class="tag P1">P1</span> 4 hours: something is down or many customers are hit</li>
+        <li><span class="tag P2">P2</span> 24 hours: serious, but there's a workaround</li>
+        <li><span class="tag P3">P3</span> 3 days: normal work</li>
+        <li><span class="tag P4">P4</span> 5 days: nice to fix</li>
+      </ul>
+      <p class="muted">The SLA clock starts when the team receives the item. The team's Lead can adjust priority later (with a reason).</p>
+    </div>
+    {% include "ops/_newt.html" with size="150" class_="aside-newt" %}
+  </aside>
+</div>
+{% endblock %}

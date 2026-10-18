@@ -78,3 +78,11 @@ def test_finished_items_cannot_be_edited(world, claimed_item):
 def test_no_change_does_not_bump_version(world, claimed_item):
     item = update_item(world.alice, claimed_item, version=claimed_item.version, priority="P2")
     assert item.version == claimed_item.version
+
+
+def test_stale_request_gets_409_even_if_it_also_breaks_a_rule(world, claimed_item):
+    # The Lead loaded v2 and tries to lower priority without a reason, but alice changed it first.
+    lead_view = WorkItem.objects.get(pk=claimed_item.pk)
+    update_item(world.alice, claimed_item, version=2, priority="P1")
+    with pytest.raises(ConflictError):  # not "reason required": their whole view is outdated
+        update_item(world.lead, lead_view, version=2, priority="P4")
