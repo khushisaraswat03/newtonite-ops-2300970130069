@@ -98,7 +98,7 @@ def claim_item(user, item):
         assignee=user, status=S.IN_PROGRESS, version=F("version") + 1, updated_at=timezone.now(),
     )
     if updated == 0:
-        raise ConflictError("Someone else has already claimed this item.")
+        raise ConflictError("Someone else has already claimed this item.", current=WorkItem.objects.get(pk=item.pk))
 
     _log(item, user, E.CLAIMED, new=user.username)
     _log(item, user, E.STATUS_CHANGED, old=S.OPEN, new=S.IN_PROGRESS)
@@ -117,7 +117,7 @@ def release_item(user, item):
         assignee=None, status=S.OPEN, version=F("version") + 1, updated_at=timezone.now(),
     )
     if updated == 0:
-        raise ConflictError("You can only release an In Progress item that is assigned to you.")
+        raise ConflictError("You can only release an In Progress item that is assigned to you.", current=WorkItem.objects.get(pk=item.pk))
 
     _log(item, user, E.RELEASED, old=user.username)
     _log(item, user, E.STATUS_CHANGED, old=S.IN_PROGRESS, new=S.OPEN)
@@ -143,7 +143,7 @@ def unassign_item(user, item, reason):
         assignee=None, status=S.OPEN, version=F("version") + 1, updated_at=timezone.now(),
     )
     if updated == 0:
-        raise ConflictError("This item is no longer assigned to that person. Reload and try again.")
+        raise ConflictError("This item is no longer assigned to that person. Reload and try again.", current=WorkItem.objects.get(pk=item.pk))
 
     _log(item, user, E.UNASSIGNED, old=previous.username, reason=reason.strip())
     _log(item, user, E.STATUS_CHANGED, old=S.IN_PROGRESS, new=S.OPEN)
