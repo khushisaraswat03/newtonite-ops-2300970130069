@@ -2,6 +2,8 @@
 JSON API. Views only translate HTTP <-> Python: permissions, rules and
 database work live in permissions.py, queries.py and services.py.
 
+Every write accepts an optional Idempotency-Key header (see idempotency.py).
+
 Errors always come back as {"detail": "..."} (plus "errors" for invalid fields):
     400 bad input / invalid transition    403 not allowed
     404 not found or not visible          409 conflict (plus "current": latest item)
@@ -15,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from . import services
+from .idempotency import idempotent
 from .models import WorkItem
 from .permissions import check, team_roles
 from .queries import BadQuery, filter_items, paginate
@@ -86,6 +89,7 @@ def me(request):
 
 
 @api_view(["GET", "POST"])
+@idempotent
 def item_list(request):
     """
     GET  /api/items/?view=&status=&priority=&type=&team=&assignee=&q=&cursor=&page_size=
@@ -104,6 +108,7 @@ def item_list(request):
 
 
 @api_view(["GET", "PATCH"])
+@idempotent
 def item_detail(request, pk):
     """
     GET   /api/items/<id>/
@@ -116,22 +121,26 @@ def item_detail(request, pk):
 
 
 @api_view(["POST"])
+@idempotent
 def claim(request, pk):
     return _detail(request, services.claim_item(request.user, _get_item(request, pk)))
 
 
 @api_view(["POST"])
+@idempotent
 def release(request, pk):
     return _detail(request, services.release_item(request.user, _get_item(request, pk)))
 
 
 @api_view(["POST"])
+@idempotent
 def unassign(request, pk):
     data = _validated(ReasonInput, request)
     return _detail(request, services.unassign_item(request.user, _get_item(request, pk), data["reason"]))
 
 
 @api_view(["POST"])
+@idempotent
 def transition(request, pk):
     data = _validated(TransitionInput, request)
     item = services.transition_item(
@@ -141,6 +150,7 @@ def transition(request, pk):
 
 
 @api_view(["POST"])
+@idempotent
 def handoff(request, pk):
     data = _validated(HandoffInput, request)
     item = services.handoff_item(
@@ -150,6 +160,7 @@ def handoff(request, pk):
 
 
 @api_view(["GET", "POST"])
+@idempotent
 def comments(request, pk):
     """GET newest-first comments (?before=<id> for older ones); POST {body} to add one."""
     item = _get_item(request, pk)
