@@ -128,3 +128,11 @@ def test_activity_is_paginated(world, open_item):
     assert len(first["results"]) == 50 and first["next_before"]
     second = alice.get(url(open_item, "activity"), {"before": first["next_before"]}).json()
     assert len(second["results"]) == 11 and second["next_before"] is None
+
+
+def test_create_with_past_due_date_is_rejected(world):
+    r = client_for(world.alice).post("/api/items/", {
+        "team": world.payments.id, "title": "x", "type": "task", "priority": "P3", "due_date": "2020-01-01",
+    }, format="json")
+    assert r.status_code == 400
+    assert "due_date" in r.json()["errors"]

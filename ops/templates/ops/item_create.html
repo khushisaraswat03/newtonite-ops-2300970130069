@@ -61,7 +61,7 @@
 
     <div class="field" style="max-width: 240px">
       <label for="due_date">Due date <span class="muted">(optional)</span></label>
-      <input class="input" type="date" id="due_date" name="due_date" value="{{ v.due_date }}">
+      <input class="input" type="date" id="due_date" name="due_date" min="{% now 'Y-m-d' %}" value="{{ v.due_date }}">
       {% if errors.due_date %}<div class="field-error">{{ errors.due_date.0 }}</div>{% endif %}
     </div>
 

@@ -176,7 +176,7 @@
         {% endif %}
         <div class="field">
           <label>Due date</label>
-          <input class="input" type="date" name="due_date" value="{% if attempted.due_date %}{{ attempted.due_date }}{% elif item.due_date %}{{ item.due_date|date:'Y-m-d' }}{% endif %}">
+          <input class="input" type="date" name="due_date" min="{% now 'Y-m-d' %}" value="{% if attempted.due_date %}{{ attempted.due_date }}{% elif item.due_date %}{{ item.due_date|date:'Y-m-d' }}{% endif %}">
         </div>
         <div class="field">
           <label>Reason <span class="muted">({% if allowed.set_priority %}needed to lower priority or push the date later{% else %}needed to push the date later{% endif %})</span></label>

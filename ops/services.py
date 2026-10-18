@@ -38,11 +38,18 @@ def _ensure_current(item, version):
         )
 
 
+
+def _check_due_date(due_date):
+    if due_date and due_date < timezone.localdate():
+        raise ValidationError({"due_date": "The due date can't be in the past."})
+
+
 @transaction.atomic
 def create_item(user, *, team, title, type, priority, description="", due_date=None):
     if not can_raise(user):
         raise PermissionDenied("Viewers cannot raise items.")
 
+    _check_due_date(due_date)
     title = (title or "").strip()
     if not title:
         raise ValidationError({"title": "Title is required."})
@@ -162,6 +169,7 @@ def update_item(user, item, *, version, priority=None, due_date=None, reason="")
         events.append((E.PRIORITY_CHANGED, item.priority, priority))
 
     if due_date is not None and due_date != item.due_date:
+        _check_due_date(due_date)
         if item.due_date and due_date > item.due_date and not reason:
             raise ValidationError({"reason": "A reason is required to move the due date later."})
         changes["due_date"] = due_date

@@ -86,3 +86,15 @@ def test_stale_request_gets_409_even_if_it_also_breaks_a_rule(world, claimed_ite
     update_item(world.alice, claimed_item, version=2, due_date=date(2026, 11, 1))
     with pytest.raises(ConflictError):
         update_item(world.lead, lead_view, version=2, priority="P4")
+
+
+def test_due_date_cannot_be_in_the_past(world, claimed_item):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    yesterday = timezone.localdate() - timedelta(days=1)
+    with pytest.raises(ValidationError):
+        update_item(world.alice, claimed_item, version=claimed_item.version, due_date=yesterday)
+    item = update_item(world.alice, claimed_item, version=claimed_item.version, due_date=timezone.localdate())
+    assert item.due_date == timezone.localdate()
