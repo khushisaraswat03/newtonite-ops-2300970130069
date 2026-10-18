@@ -14,10 +14,8 @@ def url(item, action=""):
     return f"/api/items/{item.id}/{action + '/' if action else ''}"
 
 
-# ---- Resource-level authorization (critical behaviour) ----
-
 def test_user_from_another_team_gets_404_on_read_and_write(world, open_item):
-    outsider = client_for(world.outsider)  # Compliance member; open_item is a Payments item
+    outsider = client_for(world.outsider)
 
     responses = [
         outsider.get(url(open_item)),
@@ -31,7 +29,7 @@ def test_user_from_another_team_gets_404_on_read_and_write(world, open_item):
     assert [r.status_code for r in responses] == [404] * len(responses)
 
     open_item.refresh_from_db()
-    assert open_item.version == 1 and open_item.assignee is None  # nothing changed
+    assert open_item.version == 1 and open_item.assignee is None
 
 
 def test_hidden_item_looks_exactly_like_a_missing_one(world, open_item):
@@ -39,7 +37,7 @@ def test_hidden_item_looks_exactly_like_a_missing_one(world, open_item):
     hidden = outsider.get(url(open_item))
     missing = outsider.get("/api/items/999999/")
     assert hidden.status_code == missing.status_code == 404
-    assert hidden.json() == missing.json()  # no way to tell the item exists
+    assert hidden.json() == missing.json()
 
 
 def test_viewer_in_team_can_read_but_gets_403_on_write(world, open_item):
@@ -52,8 +50,6 @@ def test_viewer_in_team_can_read_but_gets_403_on_write(world, open_item):
     }, format="json").status_code == 403
 
 
-# ---- Endpoints ----
-
 def test_create_item(world):
     r = client_for(world.outsider).post("/api/items/", {
         "team": world.payments.id, "title": "Wrong fee charged", "type": "payment", "priority": "P2",
@@ -61,7 +57,7 @@ def test_create_item(world):
     assert r.status_code == 201
     body = r.json()
     assert body["team_name"] == "Payments" and body["status"] == "open" and body["version"] == 1
-    assert body["allowed"]["claim"] is False  # raised it from outside, can't work it
+    assert body["allowed"]["claim"] is False
     assert body["allowed"]["comment"] is True
 
 
@@ -86,10 +82,10 @@ def test_second_claim_gets_409_with_latest_item(world, open_item):
 
 def test_patch_requires_version_and_rejects_stale_one(world, open_item):
     alice = client_for(world.alice)
-    alice.post(url(open_item, "claim"))  # version 2
+    alice.post(url(open_item, "claim"))
 
-    assert alice.patch(url(open_item), {"priority": "P1"}, format="json").status_code == 400  # no version
-    assert alice.patch(url(open_item), {"version": 2, "priority": "P1"}, format="json").status_code == 200  # v3
+    assert alice.patch(url(open_item), {"priority": "P1"}, format="json").status_code == 400
+    assert alice.patch(url(open_item), {"version": 2, "priority": "P1"}, format="json").status_code == 200
 
     r = alice.patch(url(open_item), {"version": 2, "due_date": "2026-12-01"}, format="json")
     assert r.status_code == 409
@@ -122,7 +118,7 @@ def test_comments_and_activity_timeline(world, open_item):
     assert alice.get(url(open_item, "comments")).json()["results"][0]["body"] == "Looking into it"
 
     events = alice.get(url(open_item, "activity")).json()["results"]
-    assert [e["type"] for e in events] == ["commented", "created"]  # newest first
+    assert [e["type"] for e in events] == ["commented", "created"]
 
 
 def test_activity_is_paginated(world, open_item):
@@ -133,4 +129,4 @@ def test_activity_is_paginated(world, open_item):
     first = alice.get(url(open_item, "activity")).json()
     assert len(first["results"]) == 50 and first["next_before"]
     second = alice.get(url(open_item, "activity"), {"before": first["next_before"]}).json()
-    assert len(second["results"]) == 11 and second["next_before"] is None  # 60 comments + "created"
+    assert len(second["results"]) == 11 and second["next_before"] is None

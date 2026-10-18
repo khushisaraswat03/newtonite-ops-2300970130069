@@ -1,9 +1,3 @@
-"""
-Read side: filtering, search, dashboard views and cursor pagination for item lists.
-Shared by the API and the HTML pages. Everything runs in the database; the
-browser only ever receives one page of items the user is allowed to see.
-"""
-
 import base64
 import json
 from datetime import timedelta
@@ -21,22 +15,19 @@ ACTIVE = [S.OPEN, S.IN_PROGRESS, S.AWAITING_APPROVAL]
 URGENT = [WorkItem.Priority.P1, WorkItem.Priority.P2]
 STALE_AFTER = timedelta(days=3)
 
-# Most urgent first: P1 before P2 ("P1" < "P2" as text), then nearest SLA deadline.
-# id is last so the order is always unique, which cursor pagination needs.
 ORDERING = ("priority", "sla_due_at", "id")
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 100
 
 
 class BadQuery(Exception):
-    """Invalid filter or cursor in the request. Maps to HTTP 400."""
+    pass
 
 
 def lead_team_ids(user):
     return [team_id for team_id, role in team_roles(user).items() if role == LEAD]
 
 
-# Dashboard "needs attention" views.
 def apply_view(qs, user, view):
     now = timezone.now()
     if view == "assigned_to_me":
@@ -44,7 +35,6 @@ def apply_view(qs, user, view):
     if view == "unassigned_urgent":
         return qs.filter(status=S.OPEN, assignee__isnull=True, priority__in=URGENT)
     if view == "awaiting_my_approval":
-        # Items I could approve: in teams I lead, and not my own work (four-eyes).
         qs = qs.filter(status=S.AWAITING_APPROVAL).exclude(assignee=user)
         return qs if user.is_superuser else qs.filter(team_id__in=lead_team_ids(user))
     if view == "sla_breached":
@@ -65,10 +55,6 @@ def _choices(value, allowed, name):
 
 
 def filter_items(user, params):
-    """
-    Build the queryset for a list request. `params` is a dict-like of query parameters:
-      view, status, priority, type (comma-separated lists allowed), team, assignee (id, "me", "none"), q.
-    """
     qs = visible_items(user).select_related("team", "assignee", "created_by")
 
     if params.get("view"):
@@ -95,7 +81,6 @@ def filter_items(user, params):
         qs = qs.filter(assignee_id=int(assignee))
 
     if params.get("q"):
-        # Postgres full-text search; same expression as the GIN index on WorkItem, so the index is used.
         qs = qs.annotate(search=SearchVector("title", "description", config="english")).filter(
             search=SearchQuery(params["q"], config="english", search_type="websearch")
         )
@@ -120,14 +105,6 @@ def _decode_cursor(cursor):
 
 
 def paginate(qs, cursor=None, page_size=None):
-    """
-    Keyset ("cursor") pagination: instead of OFFSET 5000 (which makes the database
-    read and throw away 5000 rows), we remember the last item of the page and ask
-    for rows that come after it in the sort order. Every page costs the same,
-    and new items arriving while you browse don't shift or duplicate rows.
-
-    Returns (items, next_cursor); next_cursor is None on the last page.
-    """
     try:
         size = min(int(page_size or DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE)
     except ValueError:
@@ -137,14 +114,13 @@ def paginate(qs, cursor=None, page_size=None):
 
     if cursor:
         p, sla, item_id = _decode_cursor(cursor)
-        # "After (p, sla, id)" in (priority, sla_due_at, id) order.
         qs = qs.filter(
             Q(priority__gt=p)
             | Q(priority=p, sla_due_at__gt=sla)
             | Q(priority=p, sla_due_at=sla, id__gt=item_id)
         )
 
-    rows = list(qs[: size + 1])  # fetch one extra to know if there is a next page
+    rows = list(qs[: size + 1])
     items = rows[:size]
     next_cursor = _encode_cursor(items[-1]) if len(rows) > size else None
     return items, next_cursor

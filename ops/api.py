@@ -1,14 +1,3 @@
-"""
-JSON API. Views only translate HTTP <-> Python: permissions, rules and
-database work live in permissions.py, queries.py and services.py.
-
-Every write accepts an optional Idempotency-Key header (see idempotency.py).
-
-Errors always come back as {"detail": "..."} (plus "errors" for invalid fields):
-    400 bad input / invalid transition    403 not allowed
-    404 not found or not visible          409 conflict (plus "current": latest item)
-"""
-
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import Http404
 from rest_framework import exceptions, status
@@ -31,7 +20,6 @@ ACTIVITY_PAGE_SIZE = 50
 
 
 def exception_handler(exc, context):
-    """Turn our domain errors into HTTP responses; everything else goes to DRF's default."""
     if isinstance(exc, services.ConflictError):
         body = {"detail": str(exc)}
         if exc.current is not None:
@@ -45,7 +33,6 @@ def exception_handler(exc, context):
     if isinstance(exc, exceptions.ValidationError):
         errors = exc.detail if isinstance(exc.detail, dict) else {"non_field_errors": exc.detail}
         return Response({"detail": _first_message(errors), "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
-    # PermissionDenied -> 403, Http404 -> 404, not logged in -> 401
     return drf_exception_handler(exc, context)
 
 
@@ -62,7 +49,6 @@ def _validated(serializer_class, request):
 
 
 def _get_item(request, pk):
-    """Load an item the user may see. Missing and not-visible both give the same 404."""
     item = WorkItem.objects.select_related("team", "assignee", "created_by").filter(pk=pk).first()
     if item is None:
         raise Http404("Item not found.")
@@ -91,10 +77,6 @@ def me(request):
 @api_view(["GET", "POST"])
 @idempotent
 def item_list(request):
-    """
-    GET  /api/items/?view=&status=&priority=&type=&team=&assignee=&q=&cursor=&page_size=
-    POST /api/items/  {team, title, type, priority, description?, due_date?}
-    """
     if request.method == "POST":
         item = services.create_item(request.user, **_validated(CreateItemInput, request))
         return _detail(request, item, status.HTTP_201_CREATED)
@@ -110,10 +92,6 @@ def item_list(request):
 @api_view(["GET", "PATCH"])
 @idempotent
 def item_detail(request, pk):
-    """
-    GET   /api/items/<id>/
-    PATCH /api/items/<id>/  {version, priority?, due_date?, reason?}
-    """
     item = _get_item(request, pk)
     if request.method == "PATCH":
         item = services.update_item(request.user, item, **_validated(EditItemInput, request))
@@ -162,7 +140,6 @@ def handoff(request, pk):
 @api_view(["GET", "POST"])
 @idempotent
 def comments(request, pk):
-    """GET newest-first comments (?before=<id> for older ones); POST {body} to add one."""
     item = _get_item(request, pk)
     if request.method == "POST":
         comment = services.add_comment(request.user, item, _validated(CommentInput, request)["body"])
@@ -172,7 +149,6 @@ def comments(request, pk):
 
 @api_view(["GET"])
 def activity(request, pk):
-    """Newest-first history. History grows forever, so it is paginated: ?before=<id> for older events."""
     item = _get_item(request, pk)
     return _paged_by_id(request, item.events.select_related("actor"), ActivityEventSerializer)
 

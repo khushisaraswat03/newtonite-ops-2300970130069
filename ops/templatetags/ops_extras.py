@@ -1,5 +1,3 @@
-"""Small display helpers for templates: SLA pills, type icons, friendly history sentences."""
-
 from django import template
 from django.utils import timezone
 from django.utils.html import format_html
@@ -23,7 +21,6 @@ STATUS_LABELS = dict(S.choices)
 
 
 def _span(delta):
-    """Human-friendly duration: 45m, 3h, 2d."""
     seconds = abs(delta.total_seconds())
     if seconds < 3600:
         return f"{max(1, int(seconds // 60))}m"
@@ -50,7 +47,7 @@ def ago(dt):
 @register.simple_tag
 def sla_pill(item):
     if item.status not in ACTIVE:
-        return ""  # finished: the status badge already says so
+        return ""
     left = item.sla_due_at - timezone.now()
     if left.total_seconds() < 0:
         return format_html('<span class="pill breached">🔥 breached {} ago</span>', _span(left))
@@ -68,7 +65,6 @@ def stale_pill(item):
 
 @register.filter
 def event_sentence(event):
-    """Turn an ActivityEvent into a short readable sentence (actor shown separately)."""
     t, old, new = event.type, event.old_value, event.new_value
     if t == "created":
         return "raised this item"
@@ -105,7 +101,6 @@ def event_icon(event):
 
 @register.simple_tag(takes_context=True)
 def query_with(context, **changes):
-    """Current query string with some parameters replaced (used for filter links and paging)."""
     params = context["request"].GET.copy()
     for key, value in changes.items():
         if value in (None, ""):

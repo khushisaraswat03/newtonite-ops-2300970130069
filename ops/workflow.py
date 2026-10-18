@@ -1,18 +1,3 @@
-"""
-Workflow rules: which status changes are allowed, who may make them, and when a reason is required.
-
-    Open ─claim─▶ In Progress ──▶ Awaiting Approval ──approve──▶ Resolved ──▶ Closed
-     ▲               ▲                  │                          │           │
-     │               └──── reject ──────┘                          │           │
-     │               └──── reopen by previous assignee (keeps it) ─┴───────────┤
-     └──────────────────── reopen by Lead or creator (back to queue) ──────────┘
-
-    Open / In Progress / Awaiting Approval ──cancel──▶ Cancelled (final)
-
-Open -> In Progress is not a transition here: it only happens by claiming
-(see services.claim_item), and release/unassign send an item back to Open.
-"""
-
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
 
@@ -21,21 +6,13 @@ from .permissions import ADMIN, LEAD, MEMBER, can, check, role_in_team
 
 S = WorkItem.Status
 
-# Who may make a transition:
-#   "assignee"        - the person who claimed the item (must still be in the team)
-#   "lead"            - a Lead of the item's team
-#   "approver"        - a Lead of the item's team who is NOT the assignee (four-eyes)
-#   "lead_or_creator" - a Lead, or whoever raised the item (even from another team)
-# Admins count as Leads everywhere.
 TRANSITIONS = {
     (S.IN_PROGRESS, S.AWAITING_APPROVAL): {"who": "assignee", "reason": False},
     (S.AWAITING_APPROVAL, S.RESOLVED): {"who": "approver", "reason": False},
-    (S.AWAITING_APPROVAL, S.IN_PROGRESS): {"who": "lead", "reason": True},  # reject
+    (S.AWAITING_APPROVAL, S.IN_PROGRESS): {"who": "lead", "reason": True},
     (S.RESOLVED, S.CLOSED): {"who": "lead", "reason": False},
-    # Reopen: the previous assignee continues the work themselves...
     (S.RESOLVED, S.IN_PROGRESS): {"who": "assignee", "reason": True},
     (S.CLOSED, S.IN_PROGRESS): {"who": "assignee", "reason": True},
-    # ...or a Lead / the creator sends it back to the team queue for anyone to claim.
     (S.RESOLVED, S.OPEN): {"who": "lead_or_creator", "reason": True},
     (S.CLOSED, S.OPEN): {"who": "lead_or_creator", "reason": True},
     (S.OPEN, S.CANCELLED): {"who": "lead", "reason": True},
@@ -52,7 +29,7 @@ DENIED_MESSAGES = {
 
 
 class TransitionError(Exception):
-    """The requested status change is not valid (bad jump, missing reason)."""
+    pass
 
 
 def _who_allowed(user, item, who):
@@ -70,9 +47,6 @@ def _who_allowed(user, item, who):
 
 
 def check_transition(user, item, new_status, reason=""):
-    """Raise TransitionError or PermissionDenied unless `user` may move `item` to `new_status`."""
-    # 404 if they can't see it at all; beyond that, the "who" rule below decides
-    # (this is what lets a creator from another team reopen their own item).
     check(user, "view", item)
 
     rule = TRANSITIONS.get((item.status, new_status))
@@ -89,7 +63,6 @@ def check_transition(user, item, new_status, reason=""):
 
 
 def allowed_transitions(user, item):
-    """Statuses this user could move the item to right now (used to show the right buttons)."""
     result = []
     for (old, new) in TRANSITIONS:
         if old != item.status:
@@ -103,8 +76,6 @@ def allowed_transitions(user, item):
 
 
 def allowed_actions(user, item):
-    """Everything the user may do with the item right now, so screens show only valid buttons.
-    The server still checks every action; this is a convenience, not security."""
     return {
         "claim": can(user, "claim", item) and item.status == S.OPEN and item.assignee_id is None,
         "release": item.assignee_id == user.id and item.status == S.IN_PROGRESS,

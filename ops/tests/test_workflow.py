@@ -9,7 +9,6 @@ S = WorkItem.Status
 
 
 def move(user, item, status, reason=""):
-    """Transition using the item's current version, like a user who just loaded the page."""
     item.refresh_from_db()
     return transition_item(user, item, status, version=item.version, reason=reason)
 
@@ -86,7 +85,6 @@ def test_lead_reopen_sends_item_back_to_queue(world, resolved_item):
 
 
 def test_creator_from_another_team_can_reopen_to_queue(world):
-    # Compliance member raises an item for Payments, Payments resolves it.
     item = create_item(world.outsider, team=world.payments, title="Wrong fee charged", type="payment", priority="P3")
     claim_item(world.alice, item)
     move(world.alice, item, S.AWAITING_APPROVAL)
@@ -118,6 +116,6 @@ def test_viewer_cannot_change_status(world, open_item):
 def test_transition_on_stale_version_conflicts(world, open_item):
     item = claim_item(world.alice, open_item)
     stale_version = item.version
-    move(world.alice, item, S.AWAITING_APPROVAL)  # version moves on
+    move(world.alice, item, S.AWAITING_APPROVAL)
     with pytest.raises(ConflictError):
         transition_item(world.lead, item, S.CANCELLED, version=stale_version, reason="Not needed")

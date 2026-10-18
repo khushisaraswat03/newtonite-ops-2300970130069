@@ -21,7 +21,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# Real values come from the environment (see .env.example); the fallback is for local dev only.
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-only-insecure-key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -67,6 +66,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'ops.context_processors.notifications',
             ],
         },
     },
@@ -78,8 +78,6 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Postgres is required (not SQLite): the concurrency guarantees rely on its
-# row-level locking and transactional behaviour.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',

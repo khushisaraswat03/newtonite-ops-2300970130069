@@ -20,6 +20,7 @@
         <a href="{% url 'item_create' %}" class="{% if nav == 'create' %}active{% endif %}">+ Raise item</a>
       </nav>
       <div class="who">
+        <a class="bell {% if nav == 'notifications' %}active{% endif %}" href="{% url 'notifications' %}" title="Notifications">🔔{% if unread_count %}<span class="badge">{{ unread_count }}</span>{% endif %}</a>
         <span class="avatar">{{ request.user.username|first }}</span>
         <span>{{ request.user.username }}</span>
         <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout">Log out</button></form>
@@ -35,8 +36,6 @@
   </main>
 {% endblock %}
 <script>
-  // First line of double-click defence: disable the button as soon as a form is sent.
-  // (The second line is the idempotency key in each form, checked on the server.)
   document.addEventListener("submit", function (e) {
     e.target.querySelectorAll("button[type=submit], button:not([type])").forEach(function (b) {
       b.disabled = true;

@@ -67,7 +67,7 @@ def test_page_size_is_capped(world):
     for i in range(3):
         create_item(world.alice, team=world.payments, title=f"Item {i}", type="task", priority="P3")
     r = client_for(world.alice).get("/api/items/", {"page_size": 5000})
-    assert r.status_code == 200  # capped at MAX_PAGE_SIZE rather than loading everything
+    assert r.status_code == 200
 
 
 def test_bad_cursor_and_filters_give_400(world):
@@ -99,6 +99,5 @@ def test_dashboard_views(world):
     assert ids(client_for(world.bob).get("/api/items/", {"view": "assigned_to_me"})) == [mine.id]
     assert ids(client_for(world.bob).get("/api/items/", {"view": "unassigned_urgent"})) == [urgent.id]
     assert ids(client_for(world.lead).get("/api/items/", {"view": "awaiting_my_approval"})) == [waiting.id]
-    # A member is not an approver, and an assignee never sees their own work as "awaiting my approval".
     assert ids(client_for(world.bob).get("/api/items/", {"view": "awaiting_my_approval"})) == []
     assert ids(client_for(world.alice).get("/api/items/", {"view": "awaiting_my_approval"})) == []

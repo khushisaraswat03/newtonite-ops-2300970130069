@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ActivityEvent, Comment, IdempotencyKey, Membership, Team, WorkItem
+from .models import ActivityEvent, Comment, IdempotencyKey, Membership, Notification, OutboxJob, Team, WorkItem
 
 
 @admin.register(Team)
@@ -26,7 +26,6 @@ class ActivityEventAdmin(admin.ModelAdmin):
     list_display = ["item", "actor", "type", "old_value", "new_value", "created_at"]
     list_filter = ["type"]
 
-    # History is append-only: read it here, never edit it.
     def has_change_permission(self, request, obj=None):
         return False
 
@@ -36,3 +35,14 @@ class ActivityEventAdmin(admin.ModelAdmin):
 
 admin.site.register(Comment)
 admin.site.register(IdempotencyKey)
+
+
+@admin.register(OutboxJob)
+class OutboxJobAdmin(admin.ModelAdmin):
+    list_display = ["id", "kind", "status", "attempts", "run_after", "last_error", "created_at"]
+    list_filter = ["status", "kind"]
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ["user", "message", "created_at", "read_at"]

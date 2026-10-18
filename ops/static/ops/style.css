@@ -1,26 +1,13 @@
-/* ==========================================================
-   Newtonite Ops: "cute sticker" design system
-   Navy outlines + hard offset shadows, pastel blues, warm pops for urgency.
-   ========================================================== */
-
 :root {
-  --ink: #1B2A4A;          /* text + outlines */
-  --ink-soft: #4A5B7D;
-  --paper: #EEF4FF;        /* page background */
-  --dot: #D3E0FB;          /* background dots */
-  --card: #FFFFFF;
-  --blue: #3B6CF6;         /* primary */
-  --blue-dark: #2A55D4;
+  --ink: #1B2A4A;  --ink-soft: #4A5B7D;
+  --paper: #EEF4FF;  --dot: #D3E0FB;  --card: #FFFFFF;
+  --blue: #3B6CF6;  --blue-dark: #2A55D4;
   --sky: #DCE8FF;
   --periwinkle: #C9D6FF;
   --ice: #E9F1FF;
   --baby: #BFD8FF;
 
-  --p1: #FF8A7A;           /* coral */
-  --p2: #FFB86B;           /* peach */
-  --p3: #9CC2FF;           /* sky */
-  --p4: #9BE3C4;           /* mint */
-  --butter: #FFE08A;
+  --p1: #FF8A7A;  --p2: #FFB86B;  --p3: #9CC2FF;  --p4: #9BE3C4;  --butter: #FFE08A;
   --pink: #FF9FB2;
 
   --radius: 16px;
@@ -54,8 +41,6 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
 
 .container { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
 
-/* ---------- Sticker primitives ---------- */
-
 .sticker {
   background: var(--card);
   border: var(--border);
@@ -83,8 +68,6 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
 .btn-coral { background: var(--p1); }
 .btn-small { padding: 5px 11px; font-size: 13px; border-radius: 10px; box-shadow: 3px 3px 0 var(--ink); }
 
-/* ---------- Top bar ---------- */
-
 .topbar {
   background: var(--card);
   border-bottom: var(--border);
@@ -111,17 +94,12 @@ a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
 .logout { background: none; border: none; color: var(--ink-soft); font: inherit; font-weight: 700; cursor: pointer; padding: 0; }
 .logout:hover { color: var(--blue); text-decoration: underline; }
 
-/* main.container: .container's padding would otherwise win over a plain `main` rule */
 main.container { padding-top: 30px; padding-bottom: 60px; }
-
-/* ---------- Flash messages ---------- */
 
 .flash { padding: 12px 16px; margin-bottom: 18px; display: flex; gap: 10px; align-items: center; font-weight: 700; }
 .flash.success { background: var(--p4); }
 .flash.error { background: var(--p1); }
 .flash.info { background: var(--sky); }
-
-/* ---------- Tags & pills ---------- */
 
 .tag {
   display: inline-block;
@@ -165,8 +143,6 @@ main.container { padding-top: 30px; padding-bottom: 60px; }
 .muted { color: var(--ink-soft); }
 .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
 
-/* ---------- Login ---------- */
-
 .login-wrap { min-height: calc(100vh - 0px); display: grid; place-items: center; padding: 24px; }
 .login-card { width: 100%; max-width: 410px; padding: 34px 32px 28px; position: relative; text-align: center; }
 .login-card .newt { position: absolute; top: -62px; left: 50%; transform: translateX(-50%); }
@@ -197,7 +173,6 @@ main.container { padding-top: 30px; padding-bottom: 60px; }
 }
 .chip:hover { background: var(--sky); }
 
-/* little bob for the mascot */
 @keyframes bob { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -6px); } }
 .login-card .newt { animation: bob 3s ease-in-out infinite; }
 @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
@@ -206,8 +181,6 @@ main.container { padding-top: 30px; padding-bottom: 60px; }
 @media (prefers-reduced-motion: reduce) {
   .login-card .newt, .newt-eyes { animation: none; }
 }
-
-/* ---------- Dashboard ---------- */
 
 .hello { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
 .hello p { margin: 0; color: var(--ink-soft); font-weight: 600; }
@@ -239,8 +212,6 @@ main.container { padding-top: 30px; padding-bottom: 60px; }
 
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
 
-/* ---------- Item rows ---------- */
-
 .item-list { padding: 6px; }
 .item-row {
   display: grid;
@@ -269,15 +240,11 @@ main.container { padding-top: 30px; padding-bottom: 60px; }
   .hello .newt { display: none; }
 }
 
-/* ---------- Item list filters ---------- */
-
 .filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px; margin-bottom: 10px; align-items: center; }
 .filters .search { flex: 1 1 280px; }
 .filters select { width: auto; flex: 0 1 auto; padding: 9px 10px; }
 .filters .clear { font-weight: 800; }
 .list-note { font-size: 13px; font-weight: 600; margin: 4px 4px 14px; }
-
-/* ---------- Create form ---------- */
 
 .create-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 26px; align-items: start; }
 .create-card { padding: 26px 26px 24px; }
@@ -296,8 +263,6 @@ main.container { padding-top: 30px; padding-bottom: 60px; }
 .tip .tag { margin-right: 6px; }
 .tip p { font-size: 12.5px; margin: 0; }
 .aside-newt { transform: scaleX(-1); }
-
-/* ---------- Item detail ---------- */
 
 .back { display: inline-block; margin-bottom: 14px; font-family: var(--font-head); font-weight: 500; }
 .detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 26px; align-items: start; }
@@ -360,3 +325,24 @@ main.container { padding-top: 30px; padding-bottom: 60px; }
   .create-aside, .detail-side { position: static; }
   .field-row { grid-template-columns: 1fr; }
 }
+
+.bell {
+  position: relative; font-size: 19px; width: 38px; height: 38px; display: grid; place-items: center;
+  border-radius: 10px; border: 2.5px solid transparent;
+}
+.bell:hover { text-decoration: none; background: var(--ice); }
+.bell.active { background: var(--sky); border-color: var(--ink); }
+.badge {
+  position: absolute; top: -6px; right: -8px;
+  min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+  background: var(--p1); color: var(--ink); border: 2px solid var(--ink);
+  font: 800 11px/16px var(--font-body); text-align: center;
+}
+.notes { padding: 6px; }
+.note { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 12px; color: var(--ink); }
+.note + .note { border-top: 2px dashed var(--ice); }
+.note:hover { background: var(--ice); text-decoration: none; }
+.note .note-msg { flex: 1; font-weight: 700; }
+.note.new { background: #FFF6DA; }
+.note .new-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--blue); border: 2px solid var(--ink); flex: 0 0 auto; }
+.note .old-dot { width: 10px; flex: 0 0 auto; }

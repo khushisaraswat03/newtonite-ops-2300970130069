@@ -1,17 +1,10 @@
-"""
-All writes to work items go through these functions.
-
-Each one runs in a single database transaction that saves the change AND its
-activity event together, so the history can never disagree with the item.
-Views (API and HTML) only parse input and call these.
-"""
-
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
 from .models import ActivityEvent, Comment, WorkItem
+from .outbox import lead_ids, notify
 from .permissions import ADMIN, LEAD, can_raise, check, role_in_team
 from .workflow import TransitionError, check_transition
 
@@ -20,32 +13,23 @@ S = WorkItem.Status
 
 
 class ConflictError(Exception):
-    """Someone else changed the item first (lost a race, or a stale version). Maps to HTTP 409."""
-
     def __init__(self, message, current=None):
         super().__init__(message)
-        self.current = current  # the latest item, so the client can show what changed
+        self.current = current
 
 
 def _log(item, actor, type, old="", new="", reason="", at=None):
-    """Record an activity event and mark the item as recently active. Call inside a transaction."""
     at = at or timezone.now()
     ActivityEvent.objects.create(
         item=item, actor=actor, type=type,
         old_value=str(old)[:200], new_value=str(new)[:200], reason=reason, created_at=at,
     )
-    # A targeted UPDATE of one column, so it can't overwrite other fields changed concurrently.
     WorkItem.objects.filter(pk=item.pk).update(last_activity_at=at)
     item.last_activity_at = at
 
 
 def _ensure_current(item, version):
-    """
-    Reject a stale request before checking anything else: if the user was looking at an
-    old version, "you need a reason" or "invalid transition" would be about data they
-    haven't seen. (The conditional UPDATE still guards the race between here and the write.)
-    """
-    item.refresh_from_db()  # judge the request against the latest data, not the caller's copy
+    item.refresh_from_db()
     if item.version != version:
         raise ConflictError(
             f"This item was changed by someone else (you had version {version}, "
@@ -89,22 +73,12 @@ def add_comment(user, item, body):
         raise ValidationError({"body": "Comment cannot be empty."})
 
     comment = Comment.objects.create(item=item, author=user, body=body)
-    # Comments don't change the item, so they don't bump its version
-    # (otherwise a comment would make everyone else's open edit "stale").
     _log(item, user, E.COMMENTED, new=body, at=comment.created_at)
     return comment
 
 
 @transaction.atomic
 def claim_item(user, item):
-    """
-    Take an Open, unassigned item and start work on it.
-
-    The check and the change are ONE conditional UPDATE, so two people clicking
-    at the same moment can't both win: Postgres locks the row for the first
-    UPDATE, the second waits, then re-checks "assignee IS NULL", finds it false,
-    and updates 0 rows.
-    """
     check(user, "claim", item)
 
     updated = WorkItem.objects.filter(
@@ -117,13 +91,13 @@ def claim_item(user, item):
 
     _log(item, user, E.CLAIMED, new=user.username)
     _log(item, user, E.STATUS_CHANGED, old=S.OPEN, new=S.IN_PROGRESS)
+    notify([item.created_by_id], item, f"{user.username} picked up your item “{item.title}”", exclude=user.id)
     item.refresh_from_db()
     return item
 
 
 @transaction.atomic
 def release_item(user, item):
-    """The assignee gives an In Progress item back to the team queue."""
     check(user, "release", item)
 
     updated = WorkItem.objects.filter(
@@ -142,16 +116,11 @@ def release_item(user, item):
 
 @transaction.atomic
 def unassign_item(user, item, reason):
-    """
-    A Lead frees up a stuck item so someone else can claim it.
-    Leads never choose who does the work (pull model); they only return it to the queue.
-    """
     check(user, "unassign", item)
     if not (reason or "").strip():
         raise ValidationError({"reason": "A reason is required to unassign someone."})
 
     previous = item.assignee
-    # Only unassign the person the Lead saw: if it changed meanwhile, don't touch it.
     updated = WorkItem.objects.filter(
         pk=item.pk, status=S.IN_PROGRESS, assignee=previous, assignee__isnull=False,
     ).update(
@@ -167,20 +136,11 @@ def unassign_item(user, item, reason):
 
 
 FINISHED = {S.CLOSED, S.CANCELLED}
-# P1 is the most urgent: a higher number means lower priority.
 PRIORITY_RANK = {p: i for i, p in enumerate(WorkItem.Priority.values)}
 
 
 @transaction.atomic
 def update_item(user, item, *, version, priority=None, due_date=None, reason=""):
-    """
-    Change priority and/or due date. Title and description are the original
-    report and are not editable; clarifications go in comments.
-
-    Optimistic locking: `version` is the version the user was looking at.
-    The UPDATE only applies WHERE version = <that version>; if someone changed
-    the item in the meantime, 0 rows match and we return 409 with the latest item.
-    """
     check(user, "edit", item)
     _ensure_current(item, version)
     reason = (reason or "").strip()
@@ -193,7 +153,7 @@ def update_item(user, item, *, version, priority=None, due_date=None, reason="")
     if priority is not None and priority != item.priority:
         if priority not in WorkItem.Priority.values:
             raise ValidationError({"priority": f"Must be one of {WorkItem.Priority.values}."})
-        if PRIORITY_RANK[priority] > PRIORITY_RANK[item.priority]:  # lowering
+        if PRIORITY_RANK[priority] > PRIORITY_RANK[item.priority]:
             if role_in_team(user, item.team_id) not in (LEAD, ADMIN):
                 raise PermissionDenied("Only a Lead can lower the priority.")
             if not reason:
@@ -209,7 +169,7 @@ def update_item(user, item, *, version, priority=None, due_date=None, reason="")
         events.append((E.EDITED, f"due {item.due_date or 'none'}", f"due {due_date}"))
 
     if not changes:
-        return item  # nothing changed: no new version, no history noise
+        return item
 
     updated = WorkItem.objects.filter(pk=item.pk, version=version).update(
         **changes, version=F("version") + 1, updated_at=timezone.now(),
@@ -230,11 +190,6 @@ def update_item(user, item, *, version, priority=None, due_date=None, reason="")
 
 @transaction.atomic
 def transition_item(user, item, new_status, *, version, reason=""):
-    """
-    Move an item to a new status, following the rules in workflow.py.
-    Uses the same optimistic lock as update_item: the change only applies if
-    the item is still at the version (and status) the user was looking at.
-    """
     check(user, "view", item)
     _ensure_current(item, version)
     check_transition(user, item, new_status, reason)
@@ -244,10 +199,9 @@ def transition_item(user, item, new_status, *, version, reason=""):
 
     changes = {"status": new_status}
     if new_status == S.RESOLVED:
-        changes["resolved_at"] = now  # stops the SLA clock
+        changes["resolved_at"] = now
     if old_status in (S.RESOLVED, S.CLOSED):
-        changes["resolved_at"] = None  # reopened: it is not resolved any more
-    # Reopened to the queue by a Lead or the creator: anyone can claim it again.
+        changes["resolved_at"] = None
     clears_assignee = new_status == S.OPEN and item.assignee_id is not None
     if clears_assignee:
         changes["assignee"] = None
@@ -264,8 +218,19 @@ def transition_item(user, item, new_status, *, version, reason=""):
     _log(item, user, E.STATUS_CHANGED, old=old_status, new=new_status, reason=reason, at=now)
     if clears_assignee:
         _log(item, user, E.UNASSIGNED, old=item.assignee.username, reason="Reopened to the team queue", at=now)
+    _notify_transition(user, item, old_status, new_status)
     item.refresh_from_db()
     return item
+
+
+def _notify_transition(user, item, old_status, new_status):
+    if new_status == S.AWAITING_APPROVAL:
+        notify(lead_ids(item.team_id), item, f"“{item.title}” is waiting for your approval",
+               exclude=item.assignee_id)
+    elif old_status == S.AWAITING_APPROVAL and new_status == S.IN_PROGRESS:
+        notify([item.assignee_id], item, f"{user.username} sent “{item.title}” back to you", exclude=user.id)
+    elif new_status == S.RESOLVED:
+        notify([item.created_by_id], item, f"Your item “{item.title}” was resolved 🎉", exclude=user.id)
 
 
 HANDOFF_FROM = {S.OPEN, S.IN_PROGRESS}
@@ -273,14 +238,6 @@ HANDOFF_FROM = {S.OPEN, S.IN_PROGRESS}
 
 @transaction.atomic
 def handoff_item(user, item, new_team, *, version, reason):
-    """
-    A Lead moves an item to the team that should really handle it.
-
-    In one step it lands in the new team's queue: status Open, no assignee
-    (the old assignee isn't in the new team). Priority is kept so an urgent
-    item doesn't get lost; the new team's Lead can lower it with a reason.
-    The SLA restarts for the new team; created_at still shows the total wait.
-    """
     check(user, "handoff", item)
     _ensure_current(item, version)
     reason = (reason or "").strip()
@@ -310,5 +267,9 @@ def handoff_item(user, item, new_team, *, version, reason):
         _log(item, user, E.STATUS_CHANGED, old=old_status, new=S.OPEN, reason=f"Handed off to {new_team.name}", at=now)
     if old_assignee:
         _log(item, user, E.UNASSIGNED, old=old_assignee.username, reason=f"Handed off to {new_team.name}", at=now)
+    notify(lead_ids(old_team.pk), item, f"“{item.title}” was handed off to {new_team.name}: {reason}", exclude=user.id)
+    if old_assignee:
+        notify([old_assignee.pk], item, f"“{item.title}” was moved to {new_team.name}, so you're no longer on it",
+               exclude=user.id)
     item.refresh_from_db()
     return item

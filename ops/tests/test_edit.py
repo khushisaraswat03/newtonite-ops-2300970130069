@@ -9,24 +9,22 @@ from ops.services import ConflictError, claim_item, update_item
 
 @pytest.fixture
 def claimed_item(world, open_item):
-    return claim_item(world.alice, open_item)  # alice is the assignee, version 2
+    return claim_item(world.alice, open_item)
 
 
 def test_stale_update_is_rejected_and_data_unchanged(world, claimed_item):
-    # Alice and the Lead both open the item at version 2.
     alice_view = WorkItem.objects.get(pk=claimed_item.pk)
     lead_view = WorkItem.objects.get(pk=claimed_item.pk)
 
-    update_item(world.alice, alice_view, version=2, priority="P1")  # now version 3
+    update_item(world.alice, alice_view, version=2, priority="P1")
 
     with pytest.raises(ConflictError) as exc:
         update_item(world.lead, lead_view, version=2, due_date=date(2026, 12, 1))
 
-    # The 409 carries the latest item so the user can see what changed.
     assert exc.value.current.version == 3
     item = WorkItem.objects.get(pk=claimed_item.pk)
-    assert item.priority == "P1"     # Alice's change kept
-    assert item.due_date is None     # stale change NOT applied
+    assert item.priority == "P1"
+    assert item.due_date is None
     assert item.version == 3
 
 
@@ -81,8 +79,7 @@ def test_no_change_does_not_bump_version(world, claimed_item):
 
 
 def test_stale_request_gets_409_even_if_it_also_breaks_a_rule(world, claimed_item):
-    # The Lead loaded v2 and tries to lower priority without a reason, but alice changed it first.
     lead_view = WorkItem.objects.get(pk=claimed_item.pk)
     update_item(world.alice, claimed_item, version=2, priority="P1")
-    with pytest.raises(ConflictError):  # not "reason required": their whole view is outdated
+    with pytest.raises(ConflictError):
         update_item(world.lead, lead_view, version=2, priority="P4")

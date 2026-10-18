@@ -11,24 +11,22 @@ from ops.services import ConflictError, claim_item, release_item, unassign_item
 S = WorkItem.Status
 
 
-# transaction=True: each thread needs its own real, committed transaction,
-# otherwise the test can't reproduce two simultaneous database requests.
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_claims_only_one_wins(world, open_item):
     claimers = [world.alice, world.bob, world.lead]
-    barrier = threading.Barrier(len(claimers))  # release all threads at the same instant
+    barrier = threading.Barrier(len(claimers))
     results = {}
 
     def attempt(user):
         try:
-            item = WorkItem.objects.get(pk=open_item.pk)  # each "browser" loaded the item as Open
+            item = WorkItem.objects.get(pk=open_item.pk)
             barrier.wait()
             claim_item(user, item)
             results[user.username] = "won"
         except ConflictError:
             results[user.username] = "conflict"
         finally:
-            connection.close()  # each thread opened its own DB connection
+            connection.close()
 
     threads = [threading.Thread(target=attempt, args=(u,)) for u in claimers]
     for t in threads:
@@ -43,7 +41,6 @@ def test_concurrent_claims_only_one_wins(world, open_item):
     assert item.assignee.username == winner
     assert item.status == S.IN_PROGRESS
     assert item.version == 2
-    # History agrees: exactly one claim recorded, by the winner.
     claims = ActivityEvent.objects.filter(item=item, type="claimed")
     assert [e.actor.username for e in claims] == [winner]
 
@@ -66,7 +63,6 @@ def test_release_returns_item_to_queue(world, open_item):
     item = release_item(world.alice, open_item)
     assert item.status == S.OPEN
     assert item.assignee is None
-    # And now someone else can pick it up.
     claim_item(world.bob, item)
 
 

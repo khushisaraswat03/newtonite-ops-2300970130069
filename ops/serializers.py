@@ -6,8 +6,6 @@ from .queries import ACTIVE, STALE_AFTER
 from .workflow import allowed_actions
 
 
-# ---- Output: what the API sends back ----
-
 class WorkItemListSerializer(serializers.ModelSerializer):
     team_name = serializers.CharField(source="team.name")
     assignee = serializers.CharField(source="assignee.username", default=None)
@@ -56,9 +54,6 @@ class CommentSerializer(serializers.ModelSerializer):
         model = Comment
         fields = ["id", "author", "body", "created_at"]
 
-
-# ---- Input: validating what the client sends ----
-# These only check shape and types; business rules live in services.py.
 
 class CreateItemInput(serializers.Serializer):
     team = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all())

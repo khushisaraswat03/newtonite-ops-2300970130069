@@ -1,8 +1,8 @@
-"""The HTML pages use the same services as the API; these check the web-specific parts."""
-
 from django.test import Client
 
-from ops.models import WorkItem
+from ops import outbox
+from ops.models import Notification, WorkItem
+from ops.services import claim_item, create_item
 
 
 def client_for(user):
@@ -38,7 +38,7 @@ def test_double_submitted_create_form_makes_one_item(world):
     first = alice.post("/items/new/", form)
     second = alice.post("/items/new/", form)
     assert first.status_code == second.status_code == 302
-    assert first["Location"] == second["Location"]  # both land on the same item
+    assert first["Location"] == second["Location"]
     assert WorkItem.objects.filter(title="Card declined").count() == 1
 
 
@@ -51,8 +51,8 @@ def test_claim_button(world, open_item):
 
 def test_stale_edit_shows_conflict_box_and_keeps_input(world, open_item):
     alice = client_for(world.alice)
-    alice.post(f"/items/{open_item.id}/claim/", {"idempotency_key": "c1"})  # now version 2
-    alice.post(f"/items/{open_item.id}/edit/", {"idempotency_key": "e1", "version": 2, "priority": "P1"})  # v3
+    alice.post(f"/items/{open_item.id}/claim/", {"idempotency_key": "c1"})
+    alice.post(f"/items/{open_item.id}/edit/", {"idempotency_key": "e1", "version": 2, "priority": "P1"})
 
     r = client_for(world.lead).post(f"/items/{open_item.id}/edit/", {
         "idempotency_key": "e2", "version": 2, "priority": "P1", "due_date": "2026-12-01",
@@ -61,8 +61,8 @@ def test_stale_edit_shows_conflict_box_and_keeps_input(world, open_item):
     assert r.status_code == 409
     html = r.content.decode()
     assert "Your change was <u>not</u> saved" in html
-    assert "changed priority P2 → P1" in html  # what changed meanwhile
-    assert 'value="2026-12-01"' in html  # their attempted date is still filled in
+    assert "changed priority P2 → P1" in html
+    assert 'value="2026-12-01"' in html
     open_item.refresh_from_db()
     assert open_item.due_date is None
 
@@ -72,3 +72,13 @@ def test_rule_violation_shows_message_instead_of_crashing(world, open_item):
         f"/items/{open_item.id}/transition/", {"idempotency_key": "t1", "version": 1, "status": "cancelled"}, follow=True,
     )
     assert b"A reason is required" in r.content
+
+
+def test_notifications_page_marks_as_read(world):
+    item = create_item(world.outsider, team=world.payments, title="Wrong fee", type="payment", priority="P3")
+    claim_item(world.alice, item)
+    outbox.process_batch()
+    c = client_for(world.outsider)
+    assert b'class="badge">1<' in c.get("/").content
+    assert b"alice picked up" in c.get("/notifications/").content
+    assert not Notification.objects.filter(read_at__isnull=True).exists()

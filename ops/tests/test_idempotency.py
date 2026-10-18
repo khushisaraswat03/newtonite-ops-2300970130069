@@ -58,13 +58,10 @@ def test_failed_request_is_not_remembered(world):
     alice = client_for(world.alice)
     assert create(alice, world, key="k1", priority="P9").status_code == 400
     assert not IdempotencyKey.objects.exists()
-    # Fixing the input and retrying with the same key works.
     assert create(alice, world, key="k1").status_code == 201
 
 
 def test_double_clicked_claim_returns_success_not_conflict(world, open_item):
-    # Without a key the second click would say "someone else has claimed this item",
-    # which is confusing when that someone is you.
     alice = client_for(world.alice)
     headers = {"HTTP_IDEMPOTENCY_KEY": "claim-click-1"}
     first = alice.post(f"/api/items/{open_item.id}/claim/", **headers)
@@ -92,5 +89,5 @@ def test_simultaneous_duplicates_create_one_item(world):
     for t in threads:
         t.join()
 
-    assert statuses == [201] * copies  # every copy gets the same successful answer
-    assert WorkItem.objects.count() == 1  # but only one item exists
+    assert statuses == [201] * copies
+    assert WorkItem.objects.count() == 1

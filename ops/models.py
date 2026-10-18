@@ -17,8 +17,6 @@ class Team(models.Model):
 
 
 class Membership(models.Model):
-    """A user's role inside one team. Admin is not a team role: it is user.is_superuser."""
-
     class Role(models.TextChoices):
         VIEWER = "viewer", "Viewer"
         MEMBER = "member", "Member"
@@ -59,7 +57,6 @@ class WorkItem(models.Model):
         CLOSED = "closed", "Closed"
         CANCELLED = "cancelled", "Cancelled"
 
-    # How long each priority has before it breaches its SLA.
     SLA = {
         Priority.P1: timedelta(hours=4),
         Priority.P2: timedelta(hours=24),
@@ -79,39 +76,24 @@ class WorkItem(models.Model):
     )
     created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="created_items")
 
-    # due_date: optional business deadline chosen by the creator.
-    # sla_due_at: system deadline derived from priority (see SLA above).
     due_date = models.DateField(null=True, blank=True)
     sla_due_at = models.DateTimeField()
     resolved_at = models.DateTimeField(null=True, blank=True)
 
-    # Optimistic locking: every write must send the version it read; the
-    # service layer only updates WHERE version = <sent version>, then bumps it.
     version = models.PositiveIntegerField(default=1)
 
     created_at = models.DateTimeField(default=timezone.now)
-    # When the current team received the item (creation, or the latest handoff).
-    # The SLA is measured from here, so a team isn't blamed for time another team had it;
-    # created_at still shows how long the requester has been waiting overall.
     team_since = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
-    # Bumped by every activity event (comments too); drives stale detection.
     last_activity_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         indexes = [
-            # Lists are sorted most urgent first: (priority, sla_due_at, id) = the cursor pagination order.
-            # Team + status filtered lists can read rows straight from this index in order.
             models.Index(fields=["team", "status", "priority", "sla_due_at", "id"], name="item_team_status_idx"),
-            # Unfiltered / multi-team lists in the same order.
             models.Index(fields=["priority", "sla_due_at", "id"], name="item_urgency_idx"),
-            # "Assigned to me".
             models.Index(fields=["assignee", "status"], name="item_assignee_status_idx"),
-            # "Items I raised" for people outside the team.
             models.Index(fields=["created_by"], name="item_created_by_idx"),
-            # "SLA breached": open items whose deadline has passed.
             models.Index(fields=["status", "sla_due_at"], name="item_status_sla_idx"),
-            # Full-text search over title + description.
             GinIndex(
                 SearchVector("title", "description", config="english"),
                 name="item_search_idx",
@@ -122,13 +104,10 @@ class WorkItem(models.Model):
         return f"#{self.pk} {self.title}"
 
     def compute_sla_due_at(self, priority=None):
-        """SLA runs from when the current team got the item; a priority change recalculates it from there."""
         return self.team_since + self.SLA[priority or self.priority]
 
 
 class ActivityEvent(models.Model):
-    """Append-only history. Written in the same transaction as the change it describes."""
-
     class Type(models.TextChoices):
         CREATED = "created", "Created"
         EDITED = "edited", "Edited"
@@ -175,11 +154,8 @@ class Comment(models.Model):
 
 
 class IdempotencyKey(models.Model):
-    """Remembers the response to a request so a retry with the same key gets the same answer."""
-
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
     key = models.CharField(max_length=100)
-    # Hash of method + path + body: the same key reused for a different request is rejected.
     request_hash = models.CharField(max_length=64)
     response_status = models.PositiveSmallIntegerField()
     response_body = models.JSONField()
@@ -188,4 +164,40 @@ class IdempotencyKey(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["user", "key"], name="unique_idempotency_key_per_user"),
+        ]
+
+
+class OutboxJob(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        DONE = "done", "Done"
+        FAILED = "failed", "Failed"
+
+    kind = models.CharField(max_length=50)
+    payload = models.JSONField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    max_attempts = models.PositiveSmallIntegerField(default=5)
+    run_after = models.DateTimeField(default=timezone.now)
+    last_error = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "run_after", "id"], name="outbox_due_idx"),
+        ]
+
+
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    item = models.ForeignKey(WorkItem, on_delete=models.CASCADE, related_name="+")
+    message = models.CharField(max_length=300)
+    job = models.OneToOneField(OutboxJob, on_delete=models.SET_NULL, null=True, related_name="notification")
+    created_at = models.DateTimeField(default=timezone.now)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "read_at", "-created_at"], name="notif_user_unread_idx"),
         ]

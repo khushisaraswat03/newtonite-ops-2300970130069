@@ -25,8 +25,7 @@ def test_lead_hands_off_in_progress_item_in_one_step(world, in_progress_item):
     assert item.team == world.compliance
     assert item.status == S.OPEN
     assert item.assignee is None
-    assert item.priority == "P2"  # kept
-    # SLA restarts for the new team; created_at is unchanged (total wait still visible).
+    assert item.priority == "P2"
     assert item.team_since > item.created_at
     assert item.sla_due_at == item.team_since + WorkItem.SLA["P2"]
 
@@ -37,10 +36,10 @@ def test_lead_hands_off_in_progress_item_in_one_step(world, in_progress_item):
 def test_new_team_can_work_it_and_old_team_loses_access(world, in_progress_item):
     item = handoff_item(world.lead, in_progress_item, world.compliance, version=in_progress_item.version, reason="Compliance")
 
-    claim_item(world.outsider, item)  # a Compliance member can now claim it
+    claim_item(world.outsider, item)
     with pytest.raises(Http404):
-        check(world.bob, "view", item)  # Payments member no longer sees it
-    check(world.alice, "view", item)  # alice raised it, so she can still follow it
+        check(world.bob, "view", item)
+    check(world.alice, "view", item)
 
 
 def test_handoff_needs_reason(world, in_progress_item):

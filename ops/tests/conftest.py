@@ -1,8 +1,3 @@
-"""
-Shared test fixtures: a small, explicit world built per test (not the seed data),
-so each test shows exactly who is in which team.
-"""
-
 import pytest
 from django.contrib.auth.models import User
 
@@ -12,7 +7,6 @@ from ops.services import create_item
 
 @pytest.fixture(autouse=True)
 def fast_passwords(settings):
-    # Real password hashing is deliberately slow; tests don't need that security.
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 

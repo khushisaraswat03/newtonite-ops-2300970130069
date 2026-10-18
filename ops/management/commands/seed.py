@@ -1,13 +1,3 @@
-"""
-Seed demo data: teams, users with roles, and work items with consistent history.
-
-    python manage.py seed               # 3000 items
-    python manage.py seed --items 50    # small dataset
-    python manage.py seed --items 50000 # scale test
-
-Safe to re-run: it wipes ALL work-item data and the demo users, then recreates them.
-"""
-
 import random
 from datetime import timedelta
 
@@ -16,7 +6,9 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from ops.models import ActivityEvent, Comment, IdempotencyKey, Membership, Team, WorkItem
+from ops.models import (
+    ActivityEvent, Comment, IdempotencyKey, Membership, Notification, OutboxJob, Team, WorkItem,
+)
 
 User = get_user_model()
 
@@ -24,10 +16,8 @@ PASSWORD = "demo1234"
 
 TEAMS = ["Payments", "Compliance", "Customer Support", "Platform"]
 
-# username -> (is_admin, {team: role})
 USERS = {
     "admin": (True, {}),
-    # Lead in Payments but only a Viewer in Compliance: shows roles are per team.
     "payments_lead": (False, {"Payments": "lead", "Compliance": "viewer"}),
     "payments_member": (False, {"Payments": "member"}),
     "payments_member2": (False, {"Payments": "member"}),
@@ -37,11 +27,9 @@ USERS = {
     "support_member": (False, {"Customer Support": "member"}),
     "platform_lead": (False, {"Platform": "lead"}),
     "platform_member": (False, {"Platform": "member"}),
-    # Read-only everywhere.
     "auditor": (False, {team: "viewer" for team in TEAMS}),
 }
 
-# Which item types each team mostly deals with.
 TEAM_TYPES = {
     "Payments": ["payment", "payment", "customer_issue", "task"],
     "Compliance": ["compliance", "compliance", "task"],
@@ -87,7 +75,6 @@ TITLES = {
     ],
 }
 
-# Status path an item walks through to reach each final status.
 PATH = ["open", "in_progress", "awaiting_approval", "resolved", "closed"]
 
 STATUS_WEIGHTS = {
@@ -112,7 +99,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        rng = random.Random(42)  # fixed seed: same data on every run
+        rng = random.Random(42)
         now = timezone.now()
 
         self.wipe()
@@ -143,8 +130,9 @@ class Command(BaseCommand):
         ))
 
     def wipe(self):
-        # Order matters: history references items, items reference teams and users.
         IdempotencyKey.objects.all().delete()
+        Notification.objects.all().delete()
+        OutboxJob.objects.all().delete()
         ActivityEvent.objects.all().delete()
         Comment.objects.all().delete()
         WorkItem.objects.all().delete()
@@ -176,22 +164,17 @@ class Command(BaseCommand):
         status = rng.choices(list(STATUS_WEIGHTS), weights=STATUS_WEIGHTS.values())[0]
         priority = rng.choices(list(PRIORITY_WEIGHTS), weights=PRIORITY_WEIGHTS.values())[0]
 
-        # Active items are recent relative to their SLA: about a third are past
-        # their deadline. Finished items are spread over the last 60 days.
         if status in ACTIVE:
             created_at = now - WorkItem.SLA[priority] * rng.uniform(0.05, 1.5)
         else:
             created_at = now - timedelta(minutes=rng.randint(7 * 24 * 60, 60 * 24 * 60))
 
-        # Most items are raised inside the team; about 1 in 4 by someone from another team.
         team_people = members_by_team[team_name]
         creator = rng.choice(team_people) if rng.random() < 0.75 else rng.choice(creators)
         lead = rng.choice(leads_by_team[team_name])
 
         title = rng.choice(TITLES[item_type]).format(n=rng.randint(10000, 99999), n4=rng.randint(1000, 9999))
 
-        # Build the history first, then derive the item's fields from it,
-        # so the seeded item and its history always agree.
         events, comments = [], []
         clock = created_at
 
@@ -218,7 +201,6 @@ class Command(BaseCommand):
                 events.append(dict(actor=assignee, type="claimed", new_value=assignee.username, created_at=step(6)))
             for i in range(1, target + 1):
                 old, new = PATH[i - 1], PATH[i]
-                # Approval and closing are Lead-only steps.
                 actor = lead if new in ("resolved", "closed") else assignee
                 at = step(24)
                 events.append(dict(actor=actor, type="status_changed", old_value=old, new_value=new, created_at=at))
@@ -251,8 +233,6 @@ class Command(BaseCommand):
             team_since=created_at,
             resolved_at=resolved_at,
             last_activity_at=events[-1]["created_at"],
-            # One version per change to the item: "created" is version 1, every later change adds one.
-            # Comments don't change the item, so they don't bump the version.
             version=sum(1 for e in events if e["type"] != "commented"),
         )
         item.sla_due_at = item.compute_sla_due_at()

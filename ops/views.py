@@ -1,9 +1,3 @@
-"""
-HTML pages. Like the API, these views only handle the web side (forms,
-redirects, messages); every rule lives in permissions.py, workflow.py,
-services.py and queries.py, so the pages and the API can't disagree.
-"""
-
 import uuid
 from datetime import date
 
@@ -20,7 +14,7 @@ from django.views.decorators.http import require_POST
 
 from . import services
 from .idempotency import KeyReused, fingerprint, run_once
-from .models import Team, WorkItem
+from .models import Notification, Team, WorkItem
 from .permissions import can_raise, check, team_roles
 from .queries import BadQuery, apply_view, filter_items, lead_team_ids, paginate
 from .workflow import TRANSITIONS, TransitionError, allowed_actions
@@ -33,7 +27,6 @@ DEMO_USERS = [
     "support_member", "platform_lead", "auditor", "admin",
 ]
 
-# Button text for each status change, so users see actions rather than raw statuses.
 TRANSITION_LABELS = {
     (S.IN_PROGRESS, S.AWAITING_APPROVAL): "Submit for approval",
     (S.AWAITING_APPROVAL, S.RESOLVED): "Approve ✓",
@@ -49,7 +42,6 @@ TRANSITION_LABELS = {
 }
 
 DASHBOARD_VIEWS = [
-    # (view, label, hint, emoji, css)
     ("assigned_to_me", "Assigned to me", "In progress with you", "🙋", "t1"),
     ("unassigned_urgent", "Unassigned urgent", "P1/P2 nobody has claimed", "🔥", "t2"),
     ("awaiting_my_approval", "Awaiting my approval", "Ready for your review", "🧐", "t3"),
@@ -86,7 +78,6 @@ def dashboard(request):
     is_approver = user.is_superuser or bool(lead_team_ids(user))
     views = [v for v in DASHBOARD_VIEWS if v[0] != "awaiting_my_approval" or is_approver]
 
-    # One COUNT per tile; each is an indexed query over only the items this user may see.
     tiles = [
         {"view": v, "label": label, "hint": hint, "emoji": emoji, "css": css,
          "count": apply_view(filter_items(user, {}), user, v).count()}
@@ -173,7 +164,7 @@ def item_create(request):
             errors = {"due_date": ["Enter a valid date."]}
         except ValidationError as e:
             errors = dict(e.message_dict)
-            if "__all__" in errors:  # templates can't read keys starting with "_"
+            if "__all__" in errors:
                 errors["form"] = errors.pop("__all__")
         except KeyReused:
             errors = {"form": ["This form was already submitted. Please reload the page."]}
@@ -207,7 +198,6 @@ def _detail_context(request, item, conflict=None, attempted=None):
     rows = list(events_qs[: TIMELINE_PAGE_SIZE + 1])
     events = rows[:TIMELINE_PAGE_SIZE]
 
-    # Show full comment text next to "commented" events (they share a timestamp).
     comments = {c.created_at: c.body for c in item.comments.filter(created_at__in=[e.created_at for e in events if e.type == "commented"])}
     for e in events:
         e.comment_body = comments.get(e.created_at) if e.type == "commented" else None
@@ -244,7 +234,6 @@ def item_detail(request, pk):
 @login_required
 @require_POST
 def item_action(request, pk, action):
-    """One endpoint for every button on the item page. Each calls the matching service function."""
     user, post = request.user, request.POST
     item = _load_item(request, pk)
     version = int(post["version"]) if post.get("version", "").isdigit() else -1
@@ -288,7 +277,6 @@ def item_action(request, pk, action):
         if not replayed:
             messages.success(request, body["message"])
     except services.ConflictError as e:
-        # Show the latest item, what changed since the user loaded the page, and keep their input.
         latest = _load_item(request, pk)
         loaded_at = parse_datetime(post.get("loaded_at", "")) or latest.updated_at
         changes = list(latest.events.select_related("actor").filter(created_at__gt=loaded_at).order_by("id"))
@@ -305,9 +293,17 @@ def item_action(request, pk, action):
     except KeyReused:
         messages.error(request, "This form was already submitted. Please reload the page and try again.")
 
-    # After a handoff the user may no longer see the item; send them somewhere they can.
     try:
         check(user, "view", WorkItem.objects.get(pk=pk))
     except Http404:
         return redirect("dashboard")
     return redirect("item_detail", pk=pk)
+
+
+@login_required
+def notifications(request):
+    notes = list(Notification.objects.filter(user=request.user).select_related("item").order_by("-created_at")[:50])
+    for n in notes:
+        n.is_new = n.read_at is None
+    Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
+    return render(request, "ops/notifications.html", {"nav": "notifications", "notes": notes, "unread_count": 0})
