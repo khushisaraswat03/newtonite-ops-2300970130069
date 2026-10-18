@@ -5,34 +5,34 @@
 {% block content %}
 
 {% if conflict %}
-  <div class="conflict sticker">
-    <div class="conflict-head">⚠️ Your change was <u>not</u> saved</div>
+  <div class="conflict">
+    <div class="conflict-head">{% include "ops/_icon.html" with name="warning" %} Your change wasn't saved</div>
     <p>{{ conflict.message }}</p>
     {% if conflict.changes %}
-      <p><b>What changed while you were looking:</b></p>
+      <p><b>Here's what changed while you were looking:</b></p>
       <ul>
         {% for e in conflict.changes %}
-          <li>{{ e|event_icon }} <b>{{ e.actor.username }}</b> {{ e|event_sentence }} <span class="muted">({{ e.created_at|ago }})</span></li>
+          <li><b>{{ e.actor.username }}</b> {{ e|event_sentence }} <span class="muted">({{ e.created_at|ago }})</span></li>
         {% endfor %}
       </ul>
     {% endif %}
-    <p class="muted">The page below now shows the latest version. {% if conflict.action == "edit" %}Your edit is still filled in. Check it still makes sense, then save again.{% else %}Review it and try again if it still makes sense.{% endif %}</p>
+    <p class="muted">The page below shows the latest version. {% if conflict.action == "edit" %}Your edit is still filled in, so just check it still makes sense and save again.{% else %}Have a look, and try again if it still makes sense.{% endif %}</p>
   </div>
 {% endif %}
 
-<a class="back" href="{% url 'dashboard' %}">← Back to dashboard</a>
+<a class="back" href="{% url 'dashboard' %}">{% include "ops/_icon.html" with name="arrow-left" %} Back to dashboard</a>
 
 <div class="detail-layout">
   <div class="detail-main">
 
-    <article class="item-head sticker">
+    <article class="item-head card">
       <div class="item-head-top">
         <span class="tag {{ item.priority }}">{{ item.priority }}</span>
         <span class="status {{ item.status }}">{{ item.status|status_label }}</span>
         {% sla_pill item %} {% stale_pill item %}
-        <span class="mono muted item-id">#{{ item.id }}</span>
+        <span class="mono item-id">#{{ item.id }}</span>
       </div>
-      <h1>{{ item.type|type_icon }} {{ item.title }}</h1>
+      <h1>{{ item.title }}</h1>
       <div class="item-meta big">
         {{ item.get_type_display }}<span class="dot">·</span>{{ item.team.name }}
         <span class="dot">·</span>raised by <b>{{ item.created_by.username }}</b> {{ item.created_at|ago }}
@@ -45,10 +45,10 @@
     </article>
 
     <section class="timeline-wrap">
-      <h2>History 📜</h2>
+      <div class="section-head"><h2>History</h2></div>
 
       {% if allowed.comment %}
-        <form class="comment-form sticker" method="post" action="{% url 'item_action' item.id 'comment' %}">
+        <form class="comment-form card" method="post" action="{% url 'item_action' item.id 'comment' %}">
           {% csrf_token %}
           <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
           <textarea name="body" rows="2" placeholder="Add a comment: an update, a question, what you found…" required></textarea>
@@ -59,35 +59,35 @@
       <ol class="timeline">
         {% for e in events %}
           <li class="event {{ e.type }}">
-            <span class="event-icon">{{ e|event_icon }}</span>
+            <span class="event-icon"></span>
             <div class="event-body">
-              <div><b>{{ e.actor.username }}</b> {{ e|event_sentence }} <span class="muted">· {{ e.created_at|ago }}</span></div>
+              <div><b>{{ e.actor.username }}</b> {{ e|event_sentence }}<span class="when">· {{ e.created_at|ago }}</span></div>
               {% if e.comment_body %}<div class="bubble">{{ e.comment_body|linebreaksbr }}</div>{% endif %}
-              {% if e.reason %}<div class="reason">Reason: “{{ e.reason }}”</div>{% endif %}
+              {% if e.reason %}<div class="reason">{{ e.reason }}</div>{% endif %}
             </div>
           </li>
         {% endfor %}
       </ol>
       {% if older_before %}
-        <div class="pager"><a class="btn btn-small" href="?before={{ older_before }}">Show older history ↓</a></div>
+        <div class="pager"><a class="btn btn-small" href="?before={{ older_before }}">Show older history</a></div>
       {% endif %}
     </section>
   </div>
 
   <aside class="detail-side">
 
-    <div class="side-card sticker">
+    <div class="side-card card">
       <h3>Actions</h3>
 
       {% if not has_actions %}
-        <p class="muted">Nothing for you to do here right now.{% if allowed.comment %} You can still comment.{% endif %}</p>
+        <p class="muted">Nothing for you to do here right now.{% if allowed.comment %} You can still leave a comment.{% endif %}</p>
       {% endif %}
 
       {% if allowed.claim %}
         <form method="post" action="{% url 'item_action' item.id 'claim' %}">
           {% csrf_token %}
           <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
-          <button class="btn btn-primary wide" type="submit">🙋 Claim &amp; start work</button>
+          <button class="btn btn-primary wide" type="submit">Claim and start work</button>
         </form>
       {% endif %}
 
@@ -101,7 +101,7 @@
               <input type="hidden" name="version" value="{{ item.version }}">
               <input type="hidden" name="loaded_at" value="{{ loaded_at }}">
               <input type="hidden" name="status" value="{{ t.status }}">
-              <textarea name="reason" rows="2" placeholder="Why? (required)" required></textarea>
+              <textarea name="reason" rows="2" placeholder="A short reason (required)" required></textarea>
               <button class="btn btn-small {% if t.danger %}btn-coral{% else %}btn-primary{% endif %}" type="submit">Confirm</button>
             </form>
           </details>
@@ -112,7 +112,7 @@
             <input type="hidden" name="version" value="{{ item.version }}">
             <input type="hidden" name="loaded_at" value="{{ loaded_at }}">
             <input type="hidden" name="status" value="{{ t.status }}">
-            <button class="btn wide {% if t.status == 'resolved' %}btn-butter{% endif %}" type="submit">{{ t.label }}</button>
+            <button class="btn wide {% if t.status == 'resolved' %}btn-butter{% elif t.status == 'awaiting_approval' %}btn-primary{% endif %}" type="submit">{{ t.label }}</button>
           </form>
         {% endif %}
       {% endfor %}
@@ -121,13 +121,13 @@
         <form method="post" action="{% url 'item_action' item.id 'release' %}">
           {% csrf_token %}
           <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
-          <button class="btn wide" type="submit">↩️ Release to team queue</button>
+          <button class="btn wide" type="submit">Release to team queue</button>
         </form>
       {% endif %}
 
       {% if allowed.unassign %}
         <details class="action">
-          <summary class="btn wide">🧹 Unassign {{ item.assignee.username }}</summary>
+          <summary class="btn wide">Unassign {{ item.assignee.username }}</summary>
           <form method="post" action="{% url 'item_action' item.id 'unassign' %}">
             {% csrf_token %}
             <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
@@ -139,7 +139,7 @@
 
       {% if allowed.handoff %}
         <details class="action">
-          <summary class="btn wide">🤝 Hand off to another team</summary>
+          <summary class="btn wide">Hand off to another team</summary>
           <form method="post" action="{% url 'item_action' item.id 'handoff' %}">
             {% csrf_token %}
             <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
@@ -150,7 +150,7 @@
               {% for t in teams %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
             </select>
             <textarea name="reason" rows="2" placeholder="Why does it belong there? (required)" required></textarea>
-            <p class="hint">It goes to their queue as Open, unassigned, with a fresh SLA.</p>
+            <p class="hint">It joins their queue as Open and unassigned, with a fresh SLA.</p>
             <button class="btn btn-small btn-primary" type="submit">Hand off</button>
           </form>
         </details>
@@ -158,12 +158,13 @@
     </div>
 
     {% if allowed.edit %}
-      <form class="side-card sticker" method="post" action="{% url 'item_action' item.id 'edit' %}">
+      <form class="side-card card" method="post" action="{% url 'item_action' item.id 'edit' %}">
         {% csrf_token %}
         <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
         <input type="hidden" name="version" value="{{ item.version }}">
         <input type="hidden" name="loaded_at" value="{{ loaded_at }}">
-        <h3>Adjust ✏️</h3>
+        <h3>Adjust</h3>
+        {% if allowed.set_priority %}
         <div class="field">
           <label>Priority</label>
           <select name="priority">
@@ -172,25 +173,26 @@
             {% endfor %}
           </select>
         </div>
+        {% endif %}
         <div class="field">
           <label>Due date</label>
           <input class="input" type="date" name="due_date" value="{% if attempted.due_date %}{{ attempted.due_date }}{% elif item.due_date %}{{ item.due_date|date:'Y-m-d' }}{% endif %}">
         </div>
         <div class="field">
-          <label>Reason <span class="muted">(needed to lower priority or push the date later)</span></label>
+          <label>Reason <span class="muted">({% if allowed.set_priority %}needed to lower priority or push the date later{% else %}needed to push the date later{% endif %})</span></label>
           <input class="input" name="reason" value="{{ attempted.reason }}" placeholder="e.g. waiting on the bank">
         </div>
         <button class="btn btn-primary btn-small" type="submit">Save changes</button>
       </form>
     {% endif %}
 
-    <div class="side-card sticker facts">
+    <div class="side-card card facts">
       <h3>Details</h3>
       <dl>
-        <dt>Assignee</dt><dd>{% if item.assignee %}🙋 {{ item.assignee.username }}{% else %}<span class="muted">nobody yet</span>{% endif %}</dd>
-        <dt>Team</dt><dd>{{ item.team.name }} <span class="muted">since {{ item.team_since|ago }}</span></dd>
+        <dt>Assignee</dt><dd>{% if item.assignee %}{{ item.assignee.username }}{% else %}<span class="muted">Nobody yet</span>{% endif %}</dd>
+        <dt>Team</dt><dd>{{ item.team.name }} <span class="muted">· since {{ item.team_since|ago }}</span></dd>
         <dt>SLA deadline</dt><dd>{{ item.sla_due_at|date:"j M, H:i" }}</dd>
-        <dt>Due date</dt><dd>{% if item.due_date %}{{ item.due_date|date:"j M Y" }}{% else %}<span class="muted">none</span>{% endif %}</dd>
+        <dt>Due date</dt><dd>{% if item.due_date %}{{ item.due_date|date:"j M Y" }}{% else %}<span class="muted">None</span>{% endif %}</dd>
         <dt>Waiting since</dt><dd>{{ item.created_at|date:"j M, H:i" }} <span class="muted">({{ item.created_at|ago }})</span></dd>
         {% if item.resolved_at %}<dt>Resolved</dt><dd>{{ item.resolved_at|date:"j M, H:i" }}</dd>{% endif %}
         <dt>Version</dt><dd class="mono">v{{ item.version }}</dd>

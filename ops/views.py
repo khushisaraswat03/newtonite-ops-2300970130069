@@ -42,12 +42,12 @@ TRANSITION_LABELS = {
 }
 
 DASHBOARD_VIEWS = [
-    ("assigned_to_me", "Assigned to me", "In progress with you", "🙋", "t1"),
-    ("unassigned_urgent", "Unassigned urgent", "P1/P2 nobody has claimed", "🔥", "t2"),
-    ("awaiting_my_approval", "Awaiting my approval", "Ready for your review", "🧐", "t3"),
-    ("sla_breached", "SLA breached", "Past their deadline", "⏰", "t4"),
-    ("stale", "Gone quiet", "No activity for 3+ days", "💤", "t5"),
-    ("raised_by_me", "Raised by me", "Things you reported", "📣", "t6"),
+    ("assigned_to_me", "Assigned to me", "In progress with you", "user", "t1"),
+    ("unassigned_urgent", "Unassigned urgent", "P1/P2 nobody has claimed", "alert", "t2"),
+    ("awaiting_my_approval", "Awaiting my approval", "Ready for your review", "check", "t3"),
+    ("sla_breached", "Overdue", "Past their SLA deadline", "clock", "t4"),
+    ("stale", "Gone quiet", "No activity for 3+ days", "moon", "t5"),
+    ("raised_by_me", "Raised by me", "Things you reported", "send", "t6"),
 ]
 
 
@@ -79,9 +79,9 @@ def dashboard(request):
     views = [v for v in DASHBOARD_VIEWS if v[0] != "awaiting_my_approval" or is_approver]
 
     tiles = [
-        {"view": v, "label": label, "hint": hint, "emoji": emoji, "css": css,
+        {"view": v, "label": label, "hint": hint, "icon": icon, "css": css,
          "count": apply_view(filter_items(user, {}), user, v).count()}
-        for v, label, hint, emoji, css in views
+        for v, label, hint, icon, css in views
     ]
 
     selected = request.GET.get("view") or next((t["view"] for t in tiles if t["count"]), "assigned_to_me")
@@ -156,7 +156,7 @@ def item_create(request):
 
             _, body, replayed = run_once(user, key, fingerprint("create", {k: str(v) for k, v in data.items()}), action)
             if not replayed:
-                messages.success(request, "Item raised! It's now in the team's queue. 🎉")
+                messages.success(request, "Item raised. It's now in the team's queue.")
             return redirect("item_detail", pk=body["item_id"])
         except Team.DoesNotExist:
             errors = {"team": ["Pick a team."]}
@@ -242,7 +242,7 @@ def item_action(request, pk, action):
     def run():
         if action == "claim":
             services.claim_item(user, item)
-            return "You claimed it. It's all yours! 🙋"
+            return "You claimed this item. It's all yours."
         if action == "release":
             services.release_item(user, item)
             return "Released back to the team queue."
@@ -262,7 +262,7 @@ def item_action(request, pk, action):
             if team is None:
                 raise ValidationError({"team": "Pick a team to hand off to."})
             services.handoff_item(user, item, team, version=version, reason=reason)
-            return f"Handed off to {team.name}. 🤝"
+            return f"Handed off to {team.name}."
         if action == "comment":
             services.add_comment(user, item, post.get("body", ""))
             return "Comment added."

@@ -84,8 +84,9 @@ def test_patch_requires_version_and_rejects_stale_one(world, open_item):
     alice = client_for(world.alice)
     alice.post(url(open_item, "claim"))
 
-    assert alice.patch(url(open_item), {"priority": "P1"}, format="json").status_code == 400
-    assert alice.patch(url(open_item), {"version": 2, "priority": "P1"}, format="json").status_code == 200
+    assert alice.patch(url(open_item), {"due_date": "2026-11-01"}, format="json").status_code == 400
+    assert alice.patch(url(open_item), {"version": 2, "priority": "P1"}, format="json").status_code == 403
+    assert alice.patch(url(open_item), {"version": 2, "due_date": "2026-11-01"}, format="json").status_code == 200
 
     r = alice.patch(url(open_item), {"version": 2, "due_date": "2026-12-01"}, format="json")
     assert r.status_code == 409

@@ -30,7 +30,7 @@ services:
     env_file: .env
     environment:
       POSTGRES_HOST: db
-    command: python manage.py run_worker
+    command: sh -c "until python manage.py migrate --check > /dev/null 2>&1; do sleep 2; done; python manage.py run_worker"
     volumes:
       - .:/app
     depends_on:

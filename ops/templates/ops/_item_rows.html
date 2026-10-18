@@ -1,15 +1,13 @@
 {% load ops_extras %}
 {% if items %}
-  <div class="item-list sticker">
+  <div class="item-list card">
     {% for item in items %}
       <a class="item-row" href="{% url 'item_detail' item.id %}">
         <span class="tag {{ item.priority }}">{{ item.priority }}</span>
-        <span>
-          <div class="item-title">{{ item.type|type_icon }} {{ item.title }}</div>
+        <span style="min-width: 0">
+          <div class="item-title">{{ item.title }}</div>
           <div class="item-meta">
-            #{{ item.id }}<span class="dot">·</span>{{ item.team.name }}<span class="dot">·</span>
-            {% if item.assignee %}🙋 {{ item.assignee.username }}{% else %}unassigned{% endif %}
-            <span class="dot">·</span>raised {{ item.created_at|ago }}
+            <span class="type-label">{{ item.get_type_display }}</span><span class="dot">·</span>#{{ item.id }}<span class="dot">·</span>{{ item.team.name }}<span class="dot">·</span>{% if item.assignee %}{{ item.assignee.username }}{% else %}Unassigned{% endif %}<span class="dot">·</span>raised {{ item.created_at|ago }}
           </div>
         </span>
         <span>{% stale_pill item %}</span>
@@ -19,12 +17,12 @@
     {% endfor %}
   </div>
   <div class="pager">
-    {% if request.GET.cursor %}<a class="btn btn-small" href="{% query_with cursor='' %}">⏮ Back to start</a>{% endif %}
-    {% if next_cursor %}<a class="btn btn-small btn-primary" href="{% query_with cursor=next_cursor %}">Next page →</a>{% endif %}
+    {% if request.GET.cursor %}<a class="btn btn-small" href="{% query_with cursor='' %}">Back to start</a>{% endif %}
+    {% if next_cursor %}<a class="btn btn-small btn-primary" href="{% query_with cursor=next_cursor %}">Next page</a>{% endif %}
   </div>
 {% else %}
-  <div class="empty sticker">
-    {% include "ops/_newt.html" with size="130" %}
-    <p>{{ empty_message|default:"Nothing here. The newt is napping 💤" }}</p>
+  <div class="empty card">
+    {% include "ops/_newt.html" with size="110" %}
+    <p>{{ empty_message|default:"Nothing here. The newt is taking a nap." }}</p>
   </div>
 {% endif %}

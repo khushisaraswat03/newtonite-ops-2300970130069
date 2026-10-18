@@ -153,11 +153,10 @@ def update_item(user, item, *, version, priority=None, due_date=None, reason="")
     if priority is not None and priority != item.priority:
         if priority not in WorkItem.Priority.values:
             raise ValidationError({"priority": f"Must be one of {WorkItem.Priority.values}."})
-        if PRIORITY_RANK[priority] > PRIORITY_RANK[item.priority]:
-            if role_in_team(user, item.team_id) not in (LEAD, ADMIN):
-                raise PermissionDenied("Only a Lead can lower the priority.")
-            if not reason:
-                raise ValidationError({"reason": "A reason is required to lower the priority."})
+        if role_in_team(user, item.team_id) not in (LEAD, ADMIN):
+            raise PermissionDenied("Only a Lead of this team can change the priority.")
+        if PRIORITY_RANK[priority] > PRIORITY_RANK[item.priority] and not reason:
+            raise ValidationError({"reason": "A reason is required to lower the priority."})
         changes["priority"] = priority
         changes["sla_due_at"] = item.compute_sla_due_at(priority)
         events.append((E.PRIORITY_CHANGED, item.priority, priority))
@@ -230,7 +229,7 @@ def _notify_transition(user, item, old_status, new_status):
     elif old_status == S.AWAITING_APPROVAL and new_status == S.IN_PROGRESS:
         notify([item.assignee_id], item, f"{user.username} sent “{item.title}” back to you", exclude=user.id)
     elif new_status == S.RESOLVED:
-        notify([item.created_by_id], item, f"Your item “{item.title}” was resolved 🎉", exclude=user.id)
+        notify([item.created_by_id], item, f"Good news: your item “{item.title}” was resolved", exclude=user.id)
 
 
 HANDOFF_FROM = {S.OPEN, S.IN_PROGRESS}

@@ -6,21 +6,21 @@
   <title>{% block title %}Newtonite Ops{% endblock %} · Newtonite Ops</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'ops/style.css' %}">
 </head>
 <body>
 {% block body %}
   <header class="topbar">
     <div class="container">
-      <a class="brand" href="{% url 'dashboard' %}">{% include "ops/_newt.html" with size="46" %} Newtonite Ops</a>
+      <a class="brand" href="{% url 'dashboard' %}">{% include "ops/_newt.html" with size="38" %} Newtonite Ops</a>
       <nav class="nav">
         <a href="{% url 'dashboard' %}" class="{% if nav == 'dashboard' %}active{% endif %}">Dashboard</a>
         <a href="{% url 'item_list' %}" class="{% if nav == 'items' %}active{% endif %}">All items</a>
-        <a href="{% url 'item_create' %}" class="{% if nav == 'create' %}active{% endif %}">+ Raise item</a>
+        <a href="{% url 'item_create' %}" class="{% if nav == 'create' %}active{% endif %}">Raise an item</a>
       </nav>
       <div class="who">
-        <a class="bell {% if nav == 'notifications' %}active{% endif %}" href="{% url 'notifications' %}" title="Notifications">🔔{% if unread_count %}<span class="badge">{{ unread_count }}</span>{% endif %}</a>
+        <a class="bell {% if nav == 'notifications' %}active{% endif %}" href="{% url 'notifications' %}" title="Notifications">{% include "ops/_icon.html" with name="bell" %}{% if unread_count %}<span class="badge">{{ unread_count }}</span>{% endif %}</a>
         <span class="avatar">{{ request.user.username|first }}</span>
         <span>{{ request.user.username }}</span>
         <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout">Log out</button></form>
@@ -30,7 +30,7 @@
 
   <main class="container">
     {% for message in messages %}
-      <div class="flash sticker {{ message.tags }}">{{ message }}</div>
+      <div class="flash {{ message.tags }}">{{ message }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>

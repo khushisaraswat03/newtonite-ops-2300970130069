@@ -4,12 +4,12 @@
 
 {% block content %}
 <div class="section-head">
-  <h1>Notifications 🔔</h1>
+  <h1>Notifications</h1>
 </div>
-<p class="muted list-note">Delivered by the background worker from the outbox, so they may take a couple of seconds to appear.</p>
+<p class="muted list-note">Delivered by the background worker, so they can take a couple of seconds to show up.</p>
 
 {% if notes %}
-  <div class="notes sticker">
+  <div class="notes card">
     {% for n in notes %}
       <a class="note {% if n.is_new %}new{% endif %}" href="{% url 'item_detail' n.item_id %}">
         {% if n.is_new %}<span class="new-dot" title="New"></span>{% else %}<span class="old-dot"></span>{% endif %}
@@ -19,9 +19,9 @@
     {% endfor %}
   </div>
 {% else %}
-  <div class="empty sticker">
-    {% include "ops/_newt.html" with size="130" %}
-    <p>No notifications yet. All quiet in the pond 🌊</p>
+  <div class="empty card">
+    {% include "ops/_newt.html" with size="110" %}
+    <p>No notifications yet. All calm in the pond.</p>
   </div>
 {% endif %}
 {% endblock %}

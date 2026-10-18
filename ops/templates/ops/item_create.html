@@ -3,11 +3,11 @@
 
 {% block content %}
 <div class="create-layout">
-  <form class="create-card sticker" method="post">
+  <form class="create-card card" method="post">
     {% csrf_token %}
     <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
-    <h1>Raise an item ✨</h1>
-    <p class="muted">You can raise work for any team. That team's members will pick it up.</p>
+    <h1>Raise an item</h1>
+    <p class="muted">You can raise work for any team. Someone on that team will pick it up from their queue.</p>
 
     {% if errors.form %}<div class="form-error">{{ errors.form.0 }}</div>{% endif %}
 
@@ -65,21 +65,21 @@
       {% if errors.due_date %}<div class="field-error">{{ errors.due_date.0 }}</div>{% endif %}
     </div>
 
-    <button class="btn btn-primary" type="submit">Raise item →</button>
+    <button class="btn btn-primary" type="submit">Raise item</button>
   </form>
 
   <aside class="create-aside">
-    <div class="sticker tip">
-      <h3>How priority works 🚩</h3>
+    <div class="card tip">
+      <h3>Choosing a priority</h3>
       <ul>
-        <li><span class="tag P1">P1</span> 4 hours: something is down or many customers are hit</li>
-        <li><span class="tag P2">P2</span> 24 hours: serious, but there's a workaround</li>
-        <li><span class="tag P3">P3</span> 3 days: normal work</li>
-        <li><span class="tag P4">P4</span> 5 days: nice to fix</li>
+        <li><span class="tag P1">P1</span> 4 hours. Something is down or many customers are affected.</li>
+        <li><span class="tag P2">P2</span> 24 hours. Serious, but there's a workaround.</li>
+        <li><span class="tag P3">P3</span> 3 days. Normal work.</li>
+        <li><span class="tag P4">P4</span> 5 days. Nice to fix.</li>
       </ul>
-      <p class="muted">The SLA clock starts when the team receives the item. The team's Lead can adjust priority later (with a reason).</p>
+      <p class="muted">Not sure? Pick your best guess. The team's Lead can adjust it later.</p>
     </div>
-    {% include "ops/_newt.html" with size="150" class_="aside-newt" %}
+    {% include "ops/_newt.html" with size="120" class_="aside-newt" %}
   </aside>
 </div>
 {% endblock %}

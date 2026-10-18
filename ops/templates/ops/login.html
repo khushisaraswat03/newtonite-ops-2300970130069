@@ -3,13 +3,14 @@
 
 {% block body %}
 <div class="login-wrap">
-  <div class="login-card sticker">
-    {% include "ops/_newt.html" with size="150" %}
-    <h1>Hi there!</h1>
+  <div class="login-card card">
+    {% include "ops/_newt.html" with size="96" %}
+    <div class="brand-line">Newtonite Ops</div>
+    <h1>Welcome back</h1>
     <p class="sub">Log in to see what needs your attention today.</p>
 
     {% if form.errors %}
-      <div class="form-error">That username and password don't match. Try again?</div>
+      <div class="form-error">That username and password don't match. Mind trying again?</div>
     {% endif %}
 
     <form method="post">
@@ -29,7 +30,7 @@
 
     {% if show_demo_users %}
     <div class="demo-users">
-      Demo accounts (password <b>demo1234</b>). Click one to fill it in:
+      Demo accounts, password <b>demo1234</b>. Click one to fill it in.
       <div class="chips">
         {% for name in demo_users %}
           <button type="button" class="chip" onclick="document.getElementById('id_username').value='{{ name }}';document.getElementById('id_password').value='demo1234';">{{ name }}</button>

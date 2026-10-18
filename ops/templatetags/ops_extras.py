@@ -1,6 +1,7 @@
 from django import template
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
 from ops.models import WorkItem
 from ops.queries import ACTIVE, STALE_AFTER
@@ -9,15 +10,13 @@ register = template.Library()
 
 S = WorkItem.Status
 
-TYPE_ICONS = {
-    "incident": "🚨",
-    "customer_issue": "💬",
-    "payment": "💳",
-    "compliance": "📋",
-    "task": "✅",
-}
-
 STATUS_LABELS = dict(S.choices)
+
+CLOCK = mark_safe(
+    '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+)
 
 
 def _span(delta):
@@ -27,11 +26,6 @@ def _span(delta):
     if seconds < 86400:
         return f"{int(seconds // 3600)}h"
     return f"{int(seconds // 86400)}d"
-
-
-@register.filter
-def type_icon(item_type):
-    return TYPE_ICONS.get(item_type, "•")
 
 
 @register.filter
@@ -50,16 +44,16 @@ def sla_pill(item):
         return ""
     left = item.sla_due_at - timezone.now()
     if left.total_seconds() < 0:
-        return format_html('<span class="pill breached">🔥 breached {} ago</span>', _span(left))
+        return format_html('<span class="pill breached">{}Overdue by {}</span>', CLOCK, _span(left))
     total = WorkItem.SLA[item.priority]
     css = "soon" if left < total / 4 else "ok"
-    return format_html('<span class="pill {}">⏰ {} left</span>', css, _span(left))
+    return format_html('<span class="pill {}">{}{} left</span>', css, CLOCK, _span(left))
 
 
 @register.simple_tag
 def stale_pill(item):
     if item.status in ACTIVE and item.last_activity_at < timezone.now() - STALE_AFTER:
-        return format_html('<span class="pill stale">💤 quiet {}</span>', _span(timezone.now() - item.last_activity_at))
+        return format_html('<span class="pill stale">Quiet for {}</span>', _span(timezone.now() - item.last_activity_at))
     return ""
 
 
@@ -87,16 +81,6 @@ def event_sentence(event):
     return t
 
 
-EVENT_ICONS = {
-    "created": "✨", "claimed": "🙋", "released": "↩️", "unassigned": "🧹",
-    "status_changed": "➡️", "priority_changed": "🚩", "handed_off": "🤝",
-    "edited": "✏️", "commented": "💬",
-}
-
-
-@register.filter
-def event_icon(event):
-    return EVENT_ICONS.get(event.type, "•")
 
 
 @register.simple_tag(takes_context=True)

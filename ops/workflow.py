@@ -81,6 +81,7 @@ def allowed_actions(user, item):
         "release": item.assignee_id == user.id and item.status == S.IN_PROGRESS,
         "unassign": can(user, "unassign", item) and item.assignee_id is not None and item.status == S.IN_PROGRESS,
         "edit": can(user, "edit", item) and item.status not in (S.CLOSED, S.CANCELLED),
+        "set_priority": role_in_team(user, item.team_id) in (LEAD, ADMIN) and item.status not in (S.CLOSED, S.CANCELLED),
         "handoff": can(user, "handoff", item) and item.status in (S.OPEN, S.IN_PROGRESS),
         "comment": can(user, "comment", item),
         "transitions": allowed_transitions(user, item),

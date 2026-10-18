@@ -4,11 +4,11 @@
 {% block content %}
 <div class="section-head">
   <h1>All items</h1>
-  <a class="btn btn-butter" href="{% url 'item_create' %}">+ Raise item</a>
+  <a class="btn btn-primary" href="{% url 'item_create' %}">{% include "ops/_icon.html" with name="plus" %} Raise an item</a>
 </div>
 
-<form class="filters sticker" method="get">
-  <input class="input search" type="search" name="q" value="{{ f.q }}" placeholder="🔍  Search titles & descriptions… e.g. refund">
+<form class="filters card" method="get">
+  <input class="input search" type="search" name="q" value="{{ f.q }}" placeholder="Search titles and descriptions, e.g. refund">
   <select name="status">
     <option value="">Any status</option>
     {% for value, label in statuses %}<option value="{{ value }}" {% if f.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
@@ -34,7 +34,7 @@
   {% if filters_on %}<a class="clear" href="{% url 'item_list' %}">Clear</a>{% endif %}
 </form>
 
-<p class="muted list-note">Most urgent first: P1 before P2, then nearest SLA deadline. Only items you're allowed to see are listed.</p>
+<p class="muted list-note">Most urgent first: P1 before P2, then the nearest SLA deadline. You only see items you have access to.</p>
 
-{% include "ops/_item_rows.html" with empty_message="No items match these filters. Try clearing some?" %}
+{% include "ops/_item_rows.html" with empty_message="No items match these filters. Try loosening them a little." %}
 {% endblock %}

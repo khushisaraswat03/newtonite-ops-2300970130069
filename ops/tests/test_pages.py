@@ -52,7 +52,7 @@ def test_claim_button(world, open_item):
 def test_stale_edit_shows_conflict_box_and_keeps_input(world, open_item):
     alice = client_for(world.alice)
     alice.post(f"/items/{open_item.id}/claim/", {"idempotency_key": "c1"})
-    alice.post(f"/items/{open_item.id}/edit/", {"idempotency_key": "e1", "version": 2, "priority": "P1"})
+    alice.post(f"/items/{open_item.id}/edit/", {"idempotency_key": "e1", "version": 2, "due_date": "2026-11-01"})
 
     r = client_for(world.lead).post(f"/items/{open_item.id}/edit/", {
         "idempotency_key": "e2", "version": 2, "priority": "P1", "due_date": "2026-12-01",
@@ -60,11 +60,12 @@ def test_stale_edit_shows_conflict_box_and_keeps_input(world, open_item):
     })
     assert r.status_code == 409
     html = r.content.decode()
-    assert "Your change was <u>not</u> saved" in html
-    assert "changed priority P2 → P1" in html
+    assert "Your change wasn&#x27;t saved" in html or "Your change wasn't saved" in html
+    assert "changed due none → due 2026-11-01" in html
     assert 'value="2026-12-01"' in html
     open_item.refresh_from_db()
-    assert open_item.due_date is None
+    assert str(open_item.due_date) == "2026-11-01"
+    assert open_item.priority == "P2"
 
 
 def test_rule_violation_shows_message_instead_of_crashing(world, open_item):

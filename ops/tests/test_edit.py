@@ -13,13 +13,13 @@ def claimed_item(world, open_item):
 
 
 def test_stale_update_is_rejected_and_data_unchanged(world, claimed_item):
-    alice_view = WorkItem.objects.get(pk=claimed_item.pk)
     lead_view = WorkItem.objects.get(pk=claimed_item.pk)
+    alice_view = WorkItem.objects.get(pk=claimed_item.pk)
 
-    update_item(world.alice, alice_view, version=2, priority="P1")
+    update_item(world.lead, lead_view, version=2, priority="P1")
 
     with pytest.raises(ConflictError) as exc:
-        update_item(world.lead, lead_view, version=2, due_date=date(2026, 12, 1))
+        update_item(world.alice, alice_view, version=2, due_date=date(2026, 12, 1))
 
     assert exc.value.current.version == 3
     item = WorkItem.objects.get(pk=claimed_item.pk)
@@ -28,17 +28,20 @@ def test_stale_update_is_rejected_and_data_unchanged(world, claimed_item):
     assert item.version == 3
 
 
-def test_assignee_can_raise_priority_and_sla_is_recalculated(world, claimed_item):
-    item = update_item(world.alice, claimed_item, version=claimed_item.version, priority="P1")
+def test_assignee_cannot_change_priority(world, claimed_item):
+    with pytest.raises(PermissionDenied):
+        update_item(world.alice, claimed_item, version=claimed_item.version, priority="P1")
+
+
+def test_lead_raises_priority_and_sla_is_recalculated(world, claimed_item):
+    item = update_item(world.lead, claimed_item, version=claimed_item.version, priority="P1")
     assert item.priority == "P1"
     assert item.sla_due_at == item.team_since + WorkItem.SLA["P1"]
     event = ActivityEvent.objects.get(item=item, type="priority_changed")
     assert (event.old_value, event.new_value) == ("P2", "P1")
 
 
-def test_only_lead_can_lower_priority_and_needs_reason(world, claimed_item):
-    with pytest.raises(PermissionDenied):
-        update_item(world.alice, claimed_item, version=claimed_item.version, priority="P4")
+def test_lowering_priority_needs_reason(world, claimed_item):
     with pytest.raises(ValidationError):
         update_item(world.lead, claimed_item, version=claimed_item.version, priority="P4")
 
@@ -74,12 +77,12 @@ def test_finished_items_cannot_be_edited(world, claimed_item):
 
 
 def test_no_change_does_not_bump_version(world, claimed_item):
-    item = update_item(world.alice, claimed_item, version=claimed_item.version, priority="P2")
+    item = update_item(world.lead, claimed_item, version=claimed_item.version, priority="P2")
     assert item.version == claimed_item.version
 
 
 def test_stale_request_gets_409_even_if_it_also_breaks_a_rule(world, claimed_item):
     lead_view = WorkItem.objects.get(pk=claimed_item.pk)
-    update_item(world.alice, claimed_item, version=2, priority="P1")
+    update_item(world.alice, claimed_item, version=2, due_date=date(2026, 11, 1))
     with pytest.raises(ConflictError):
         update_item(world.lead, lead_view, version=2, priority="P4")

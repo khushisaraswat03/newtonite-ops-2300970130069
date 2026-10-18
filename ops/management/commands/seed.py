@@ -96,9 +96,13 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--items", type=int, default=3000, help="Number of work items to create.")
+        parser.add_argument("--if-empty", action="store_true", help="Only seed if there are no work items yet.")
 
     @transaction.atomic
     def handle(self, *args, **options):
+        if options["if_empty"] and WorkItem.objects.exists():
+            self.stdout.write("Data already exists, skipping seed.")
+            return
         rng = random.Random(42)
         now = timezone.now()
 
