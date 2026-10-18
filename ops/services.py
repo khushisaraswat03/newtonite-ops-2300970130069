@@ -12,7 +12,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from .models import ActivityEvent, Comment, WorkItem
-from .permissions import can_raise, check
+from .permissions import ADMIN, LEAD, can_raise, check, role_in_team
 
 E = ActivityEvent.Type
 S = WorkItem.Status
@@ -20,6 +20,10 @@ S = WorkItem.Status
 
 class ConflictError(Exception):
     """Someone else changed the item first (lost a race, or a stale version). Maps to HTTP 409."""
+
+    def __init__(self, message, current=None):
+        super().__init__(message)
+        self.current = current  # the latest item, so the client can show what changed
 
 
 def _log(item, actor, type, old="", new="", reason="", at=None):
@@ -142,5 +146,67 @@ def unassign_item(user, item, reason):
 
     _log(item, user, E.UNASSIGNED, old=previous.username, reason=reason.strip())
     _log(item, user, E.STATUS_CHANGED, old=S.IN_PROGRESS, new=S.OPEN)
+    item.refresh_from_db()
+    return item
+
+
+FINISHED = {S.CLOSED, S.CANCELLED}
+# P1 is the most urgent: a higher number means lower priority.
+PRIORITY_RANK = {p: i for i, p in enumerate(WorkItem.Priority.values)}
+
+
+@transaction.atomic
+def update_item(user, item, *, version, priority=None, due_date=None, reason=""):
+    """
+    Change priority and/or due date. Title and description are the original
+    report and are not editable; clarifications go in comments.
+
+    Optimistic locking: `version` is the version the user was looking at.
+    The UPDATE only applies WHERE version = <that version>; if someone changed
+    the item in the meantime, 0 rows match and we return 409 with the latest item.
+    """
+    check(user, "edit", item)
+    reason = (reason or "").strip()
+
+    if item.status in FINISHED:
+        raise ValidationError(f"{item.get_status_display()} items cannot be edited. Reopen it first.")
+
+    changes, events = {}, []
+
+    if priority is not None and priority != item.priority:
+        if priority not in WorkItem.Priority.values:
+            raise ValidationError({"priority": f"Must be one of {WorkItem.Priority.values}."})
+        if PRIORITY_RANK[priority] > PRIORITY_RANK[item.priority]:  # lowering
+            if role_in_team(user, item.team_id) not in (LEAD, ADMIN):
+                raise PermissionDenied("Only a Lead can lower the priority.")
+            if not reason:
+                raise ValidationError({"reason": "A reason is required to lower the priority."})
+        changes["priority"] = priority
+        # SLA is measured from creation, so it is recalculated for the new priority.
+        changes["sla_due_at"] = item.created_at + WorkItem.SLA[priority]
+        events.append((E.PRIORITY_CHANGED, item.priority, priority))
+
+    if due_date is not None and due_date != item.due_date:
+        if item.due_date and due_date > item.due_date and not reason:
+            raise ValidationError({"reason": "A reason is required to move the due date later."})
+        changes["due_date"] = due_date
+        events.append((E.EDITED, f"due {item.due_date or 'none'}", f"due {due_date}"))
+
+    if not changes:
+        return item  # nothing changed: no new version, no history noise
+
+    updated = WorkItem.objects.filter(pk=item.pk, version=version).update(
+        **changes, version=F("version") + 1, updated_at=timezone.now(),
+    )
+    if updated == 0:
+        current = WorkItem.objects.get(pk=item.pk)
+        raise ConflictError(
+            f"This item was changed by someone else (you had version {version}, "
+            f"it is now version {current.version}). Reload and try again.",
+            current=current,
+        )
+
+    for type, old, new in events:
+        _log(item, user, type, old=old, new=new, reason=reason)
     item.refresh_from_db()
     return item

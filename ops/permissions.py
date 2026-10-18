@@ -7,6 +7,7 @@ Rules (decided in design):
 - Anyone who is a Member or Lead somewhere can RAISE an item for any team.
 - Only Members/Leads of the item's team can WORK on it.
 - Only Leads of the item's team can do the Lead-only actions.
+- Only the assignee or a Lead can edit an item (priority, due date).
 - The person who raised an item from outside the team can still comment on it.
 """
 
@@ -25,7 +26,7 @@ ACTION_ROLES = {
     "comment": WORK,
     "claim": WORK,
     "release": WORK,
-    "edit": WORK,
+    "edit": {LEAD},  # plus the assignee, see can()
     "transition": WORK,  # which transitions exactly is decided by the workflow rules
     "unassign": {LEAD},
     "handoff": {LEAD},
@@ -51,6 +52,9 @@ def can(user, action, item):
     if role == ADMIN:
         return True
     if role in ACTION_ROLES[action]:
+        return True
+    # The person working on the item may adjust it (e.g. it needs more time).
+    if action == "edit" and role in WORK and item.assignee_id == user.id:
         return True
     # Raised it from outside the team: may follow and comment, nothing else.
     if item.created_by_id == user.id and action in ("view", "comment"):

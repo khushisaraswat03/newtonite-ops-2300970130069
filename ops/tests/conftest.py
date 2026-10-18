@@ -10,6 +10,12 @@ from ops.models import Membership, Team
 from ops.services import create_item
 
 
+@pytest.fixture(autouse=True)
+def fast_passwords(settings):
+    # Real password hashing is deliberately slow; tests don't need that security.
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
 @pytest.fixture
 def world(db):
     payments = Team.objects.create(name="Payments")
