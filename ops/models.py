@@ -100,8 +100,11 @@ class WorkItem(models.Model):
 
     class Meta:
         indexes = [
-            # Team list views, filtered by status, newest first (cursor pagination order).
-            models.Index(fields=["team", "status", "-created_at", "-id"], name="item_team_status_idx"),
+            # Lists are sorted most urgent first: (priority, sla_due_at, id) = the cursor pagination order.
+            # Team + status filtered lists can read rows straight from this index in order.
+            models.Index(fields=["team", "status", "priority", "sla_due_at", "id"], name="item_team_status_idx"),
+            # Unfiltered / multi-team lists in the same order.
+            models.Index(fields=["priority", "sla_due_at", "id"], name="item_urgency_idx"),
             # "Assigned to me".
             models.Index(fields=["assignee", "status"], name="item_assignee_status_idx"),
             # "Items I raised" for people outside the team.
