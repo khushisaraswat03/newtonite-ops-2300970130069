@@ -93,7 +93,7 @@ With the containers running, in a second terminal:
 docker compose exec web pytest
 ```
 
-**82 tests**, about 15 seconds. They run against a real PostgreSQL test database, because the concurrency tests rely on Postgres row locking.
+**84 tests**, about 15 seconds. They run against a real PostgreSQL test database, because the concurrency tests rely on Postgres row locking.
 
 To run them from a local virtualenv instead (Python 3.10+):
 
